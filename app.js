@@ -17,6 +17,16 @@ const ghostCtx = ghostCanvas.getContext('2d', {willReadFrequently: true});
 const MIN_ZOOM = .25, MAX_ZOOM = 8;
 const UNIT_MM = {mm: 1, cm: 10, inch: 25.4};
 const DEFAULTS = {brightness: 0, contrast: 0, threshold: 0, method: 'none', dotsize: 4, intensity: 50, mirrored: false, despeckle: false, brushMode: 'break', brushSize: 12, brushStrength: 50, ghost: true, invert: false};
+// Each preset tunes only the existing tonal and dithering controls. Mirror is
+// intentionally excluded: transfer orientation always remains the user's choice.
+const PRESETS = {
+  clean: {label: 'clean stencil', brightness: 0, contrast: 0, method: 'none', despeckle: true, threshold: 'otsu'},
+  newsprint: {label: 'newsprint', brightness: 8, contrast: 5, method: 'round-dot', dotsize: 5, intensity: 55},
+  halftone: {label: 'halftone', brightness: 12, contrast: 0, method: 'round-dot', dotsize: 8, intensity: 50},
+  xerox: {label: 'xerox', brightness: 8, contrast: 60, method: 'bayer', dotsize: 3, intensity: 70},
+  riso: {label: 'riso', brightness: -4, contrast: 25, method: 'jarvis', dotsize: 2, intensity: 65},
+  decay: {label: 'decay', brightness: -8, contrast: 35, method: 'floyd-steinberg', dotsize: 3, intensity: 80}
+};
 const state = {...DEFAULTS, img: null, name: '', history: [], future: [], gesture: false, comparing: false, raf: 0, zoom: 1, panX: 0, panY: 0, zoomMode: 'fit', activeTool: 'brush', spaceDown: false, renderMs: 0, renderMode: 'rgb', strokes: [], currentStroke: null, strokeBefore: null, strokePointerId: null, printWidth: 100, printHeight: 75, printUnit: 'mm', dpiPreset: '203', customDpi: 300, rotate90: false, sourceHash: null, selection: null, selectSession: null};
 let importSequence = 0;
 let pendingEvidence = null;
@@ -1110,6 +1120,19 @@ function scheduleRender() {
   state.raf = requestAnimationFrame(() => { state.raf = 0; render(); });
 }
 
+function applyPreset(id) {
+  const preset = PRESETS[id];
+  if (!state.img || !preset) return;
+  pushHistory();
+  const {label, threshold, ...settings} = preset;
+  Object.assign(state, settings);
+  if (threshold === 'otsu') state.threshold = clamp(Math.round(otsuThreshold() / 2.55), 1, 100);
+  invalidateBase();
+  syncControls();
+  render();
+  status(`preset: ${label}`);
+}
+
 function syncControls() {
   const dithering = state.method !== 'none';
   $('brightness').disabled = $('contrast').disabled = !state.img;
@@ -1117,7 +1140,9 @@ function syncControls() {
   $('dotsize').disabled = $('intensity').disabled = !state.img || !dithering;
   $('threshold').disabled = !state.img || dithering;
   $('brush-mode').disabled = $('brush-size').disabled = $('brush-strength').disabled = $('ghost-toggle').disabled = !state.img;
+  for (const button of document.querySelectorAll('[data-preset]')) button.disabled = !state.img;
   for (const id of ['brightness', 'contrast', 'threshold', 'dotsize', 'intensity', 'brush-size', 'brush-strength']) $(id).value = state[id];
+  $('method').value = state.method;
   $('brush-mode').value = state.brushMode;
   $('ghost-toggle').checked = state.ghost;
   $('threshold-value').textContent = dithering ? '—' : (state.threshold ? String(state.threshold) : 'off');
@@ -1128,6 +1153,7 @@ function syncControls() {
   $('brush-size-value').textContent = String(state.brushSize);
   $('brush-strength-value').textContent = String(state.brushStrength);
   $('mirror').disabled = $('reset').disabled = $('compare').disabled = $('export').disabled = $('auto-threshold').disabled = $('despeckle').disabled = !state.img;
+  $('mirror').setAttribute('aria-pressed', String(state.mirrored));
   $('brush-tool').disabled = $('hand-tool').disabled = $('select-tool').disabled = !state.img;
   updateSelectionOverlay();
   syncZoomControls();
@@ -1207,6 +1233,9 @@ $('rotate-90').addEventListener('click', () => {
   syncPrintControls();
   status(state.rotate90 ? 'Export rotation on: 90°.' : 'Export rotation off.');
 });
+for (const button of document.querySelectorAll('[data-preset]')) {
+  button.addEventListener('click', () => applyPreset(button.dataset.preset));
+}
 $('auto-threshold').onclick = () => {
   if (!state.img || state.currentStroke) return;
   const cutoff = otsuThreshold();

@@ -10,16 +10,17 @@
 - Block 5 print and export: `4ee4b3a` (`block 5: add print export`).
 - Block 6 export evidence: `16c74db` (`block 6: add export evidence`).
 - Block 8 deploy and PWA: `7757581` (`block 8: add deploy and PWA support`).
+- Block 9 favicon and share polish: `d9637cf` (`block 9: favicon and share polish`).
 - Blocks 0–8 are implemented. The app remains dependency-free and runs without a build step.
 - Source hashes, complete settings, and deterministic stroke evidence are included in the JSON export.
 - Desktop and 390 px layouts were rendered and inspected.
 
 ## Block
-- Block 9 favicon and share polish: complete. Added the 192 px favicon, Open Graph metadata, and the `thr4ce-v2` service-worker cache with `icon-180.png` precached.
+- Block 10 workflow and texture presets: complete. Clean Stencil, Newsprint, Halftone, Xerox, Riso, and Decay apply deterministic existing-control combinations without changing mirror; each is one undo step.
 - Block 8 verification: `node --check` passed for `app.js`, `cursor.js`, and `sw.js`; manifest and installability errors were empty; the service worker activated and controlled the page; 192, 512, and 180 px icons rendered; Add-to-Home-Screen metadata was present; a full offline reload loaded the app from `thr4ce-v1`.
 
 ## In progress
 - None.
 
 ## Next
-- Block 10 presets.
+- Block 11 seeded randomize.

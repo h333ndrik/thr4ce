@@ -63,6 +63,18 @@
 
 <section class="controls" aria-label="Stencil adjustments">
   <div class="control-group">
+    <h2>Presets</h2>
+    <div class="preset-actions" role="group" aria-label="Workflow and texture presets">
+      <button id="preset-clean-stencil" type="button" data-preset="clean" disabled>Clean Stencil</button>
+      <button id="preset-newsprint" type="button" data-preset="newsprint" disabled>Newsprint</button>
+      <button id="preset-halftone" type="button" data-preset="halftone" disabled>Halftone</button>
+      <button id="preset-xerox" type="button" data-preset="xerox" disabled>Xerox</button>
+      <button id="preset-riso" type="button" data-preset="riso" disabled>Riso</button>
+      <button id="preset-decay" type="button" data-preset="decay" disabled>Decay</button>
+    </div>
+  </div>
+
+  <div class="control-group">
     <h2>Tone</h2>
     <label for="brightness">Brightness <output id="brightness-value">0</output>
       <input id="brightness" type="range" min="-100" max="100" step="1" value="0" disabled>
@@ -124,7 +136,7 @@
   <div class="control-group">
     <h2>Transform</h2>
     <div class="control-actions">
-      <button id="mirror" type="button" disabled title="Flip horizontally for stencil transfer">Mirror</button>
+      <button id="mirror" type="button" aria-pressed="false" disabled title="Flip horizontally for stencil transfer">Mirror</button>
       <button id="reset" type="button" disabled>Reset</button>
     </div>
   </div>
