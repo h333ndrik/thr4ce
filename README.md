@@ -16,6 +16,8 @@ The editor is dependency-free and runs directly in the browser. No build step is
 - Adjust brightness, contrast, and black-and-white threshold.
 - Convert artwork with Floyd–Steinberg, Jarvis–Judice–Ninke, Bayer, or round-dot halftone dithering.
 - Mirror artwork for stencil transfer.
+- Zoom from 25–800%, fit to view, and pan with the Hand tool or Space-drag.
+- Pinch to zoom and double-click or double-tap to fit.
 - Compare against the untouched source for as long as the compare control is held.
 - Undo and redo up to 50 edits.
 - Export a freshly rendered PNG at the source resolution.

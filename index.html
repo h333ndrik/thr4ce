@@ -17,14 +17,27 @@
   </label>
 </header>
 
-<section class="viewer" aria-label="Artwork preview">
-  <canvas id="canvas"></canvas>
+<section class="viewer" id="viewer" aria-label="Artwork preview">
+  <div id="canvas-stage">
+    <canvas id="canvas"></canvas>
+  </div>
+  <div id="brush-ring" aria-hidden="true" hidden></div>
   <div id="empty">Start with an image.<small>Import a flash to prepare it for stenciling.</small></div>
+  <div class="zoom-tools" aria-label="Zoom controls">
+    <button id="zoom-out" type="button" aria-label="Zoom out" title="Zoom out">−</button>
+    <span id="zoom-label">Fit</span>
+    <button id="zoom-in" type="button" aria-label="Zoom in" title="Zoom in">+</button>
+    <button id="zoom-fit" type="button" title="Fit artwork to view">Fit</button>
+  </div>
 </section>
 
 <div class="preview-meta">
   <span id="preview-label">No image loaded</span>
   <div class="preview-options">
+    <div class="tool-switch" role="group" aria-label="Canvas tool">
+      <button id="brush-tool" type="button" aria-pressed="true" title="Draw with the morphology brush">Brush</button>
+      <button id="hand-tool" type="button" aria-pressed="false" title="Drag to pan the artwork">Hand</button>
+    </div>
     <button id="undo" type="button" aria-label="Undo" title="Undo (Command/Ctrl Z)" disabled>↶</button>
     <button id="redo" type="button" aria-label="Redo" title="Redo (Command/Ctrl Shift Z)" disabled>↷</button>
     <button id="compare" type="button" title="Hold to see the original" disabled>Compare</button>

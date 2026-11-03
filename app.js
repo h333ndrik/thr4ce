@@ -2,8 +2,12 @@
 const $ = id => document.getElementById(id);
 const canvas = $('canvas');
 const ctx = canvas.getContext('2d', {willReadFrequently: true});
+const viewer = $('viewer');
+const stage = $('canvas-stage');
+const zoomLabel = $('zoom-label');
+const MIN_ZOOM = .25, MAX_ZOOM = 8;
 const DEFAULTS = {brightness: 0, contrast: 0, threshold: 0, method: 'none', dotsize: 4, intensity: 50, mirrored: false};
-const state = {...DEFAULTS, img: null, name: '', history: [], future: [], gesture: false, comparing: false, raf: 0};
+const state = {...DEFAULTS, img: null, name: '', history: [], future: [], gesture: false, comparing: false, raf: 0, zoom: 1, panX: 0, panY: 0, zoomMode: 'fit', activeTool: 'brush', spaceDown: false, renderMs: 0, renderMode: 'rgb'};
 
 function status(message) { $('status').textContent = message; }
 function snapshot() {
@@ -58,7 +62,7 @@ function importImage(file, source = 'input') {
     canvas.style.display = 'block';
     $('empty').hidden = true;
     $('preview-label').textContent = file.name;
-    syncControls(); render();
+    syncControls(); render(); fitToView();
     status('Image ready. Adjust, then export for stencil transfer.');
   };
   img.onerror = () => {
@@ -74,7 +78,6 @@ $('file').onchange = event => {
   importImage(file);
 };
 
-const viewer = document.querySelector('.viewer');
 let dragDepth = 0;
 viewer.addEventListener('dragenter', event => {
   event.preventDefault();
@@ -116,10 +119,194 @@ function render(original = false) {
   ctx.filter = 'none';
   if (dithering) applyDither(state.method, state.dotsize, state.intensity);
   else if (thresholding) applyThreshold(state.threshold * 2.55);
-  const ms = (performance.now() - t0).toFixed(0);
-  const mode = (dithering || thresholding) ? '1-bit' : 'rgb';
-  $('image-info').textContent = `${img.width} × ${img.height} · ${mode} · ${ms} ms`;
+  state.renderMs = Math.round(performance.now() - t0);
+  state.renderMode = original ? 'source' : ((dithering || thresholding) ? '1-bit' : 'rgb');
+  updateImageInfo();
 }
+
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
+function updateImageInfo() {
+  if (!state.img) {
+    $('image-info').textContent = '—';
+    return;
+  }
+  $('image-info').textContent = `${state.img.width} × ${state.img.height} · ${state.renderMode} · ${state.renderMs} ms · ${Math.round(state.zoom * 100)}%`;
+}
+
+function fitZoomValue() {
+  if (!state.img) return 1;
+  const rect = viewer.getBoundingClientRect();
+  return clamp(Math.min((rect.width - 56) / state.img.width, (rect.height - 56) / state.img.height), MIN_ZOOM, MAX_ZOOM);
+}
+
+function applyViewTransform() {
+  if (!state.img) return;
+  const rect = viewer.getBoundingClientRect();
+  stage.style.width = `${canvas.width}px`;
+  stage.style.height = `${canvas.height}px`;
+  stage.style.transform = `translate(${rect.width / 2 + state.panX}px, ${rect.height / 2 + state.panY}px) scale(${state.zoom}) translate(${-canvas.width / 2}px, ${-canvas.height / 2}px)`;
+  zoomLabel.textContent = `${Math.round(state.zoom * 100)}%`;
+  updateImageInfo();
+  syncZoomControls();
+}
+
+function syncZoomControls() {
+  $('zoom-out').disabled = !state.img || state.zoom <= MIN_ZOOM + .0001;
+  $('zoom-in').disabled = !state.img || state.zoom >= MAX_ZOOM - .0001;
+  $('zoom-fit').disabled = !state.img;
+}
+
+function fitToView() {
+  if (!state.img) return;
+  state.zoom = fitZoomValue();
+  state.panX = state.panY = 0;
+  state.zoomMode = 'fit';
+  applyViewTransform();
+}
+
+function setZoom(nextZoom, clientX, clientY, manual = true) {
+  if (!state.img) return;
+  const rect = viewer.getBoundingClientRect();
+  const x = (clientX ?? rect.left + rect.width / 2) - rect.left;
+  const y = (clientY ?? rect.top + rect.height / 2) - rect.top;
+  const oldZoom = state.zoom;
+  const next = clamp(nextZoom, MIN_ZOOM, MAX_ZOOM);
+  if (Math.abs(next - oldZoom) < .00001) return;
+  const imageOffsetX = (x - rect.width / 2 - state.panX) / oldZoom;
+  const imageOffsetY = (y - rect.height / 2 - state.panY) / oldZoom;
+  state.panX = x - rect.width / 2 - imageOffsetX * next;
+  state.panY = y - rect.height / 2 - imageOffsetY * next;
+  state.zoom = next;
+  if (manual) state.zoomMode = 'manual';
+  applyViewTransform();
+}
+
+function selectTool(tool) {
+  state.activeTool = tool;
+  $('brush-tool').setAttribute('aria-pressed', String(tool === 'brush'));
+  $('hand-tool').setAttribute('aria-pressed', String(tool === 'hand'));
+  updateViewerCursor();
+  status(tool === 'hand' ? 'Hand tool active. Drag to pan.' : 'Brush tool active.');
+}
+
+function updateViewerCursor() {
+  viewer.classList.toggle('is-pan-ready', Boolean(state.img) && (state.activeTool === 'hand' || state.spaceDown));
+}
+
+$('zoom-out').onclick = () => setZoom(state.zoom / 1.25);
+$('zoom-in').onclick = () => setZoom(state.zoom * 1.25);
+$('zoom-fit').onclick = () => { fitToView(); status('Artwork fit to view.'); };
+$('brush-tool').onclick = () => selectTool('brush');
+$('hand-tool').onclick = () => selectTool('hand');
+
+viewer.addEventListener('wheel', event => {
+  if (!state.img) return;
+  event.preventDefault();
+  const factor = Math.exp(-event.deltaY * .0015);
+  setZoom(state.zoom * factor, event.clientX, event.clientY);
+}, {passive: false});
+
+viewer.addEventListener('dblclick', event => {
+  if (!state.img || event.target.closest('button')) return;
+  fitToView();
+  status('Artwork fit to view.');
+});
+
+let panSession = null;
+let pinchSession = null;
+let lastTap = null;
+const pointers = new Map();
+
+function beginPan(pointerId, x, y) {
+  panSession = {pointerId, x, y, startPanX: state.panX, startPanY: state.panY};
+  viewer.classList.add('is-panning');
+}
+
+function beginPinch() {
+  panSession = null;
+  const [a, b] = [...pointers.values()];
+  const midX = (a.x + b.x) / 2, midY = (a.y + b.y) / 2;
+  const rect = viewer.getBoundingClientRect();
+  const imageOffsetX = (midX - rect.left - rect.width / 2 - state.panX) / state.zoom;
+  const imageOffsetY = (midY - rect.top - rect.height / 2 - state.panY) / state.zoom;
+  pinchSession = {distance: Math.hypot(a.x - b.x, a.y - b.y), zoom: state.zoom, imageOffsetX, imageOffsetY};
+}
+
+viewer.addEventListener('pointerdown', event => {
+  if (!state.img || event.target.closest('button') || event.button === 2) return;
+  event.preventDefault();
+  viewer.setPointerCapture?.(event.pointerId);
+  pointers.set(event.pointerId, {x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY});
+  if (pointers.size === 2) beginPinch();
+  else if (state.activeTool === 'hand' || state.spaceDown || event.button === 1) beginPan(event.pointerId, event.clientX, event.clientY);
+});
+
+viewer.addEventListener('pointermove', event => {
+  const point = pointers.get(event.pointerId);
+  if (!point) return;
+  const oldX = point.x, oldY = point.y;
+  point.x = event.clientX; point.y = event.clientY;
+  if (pointers.size >= 2 && pinchSession) {
+    const [a, b] = [...pointers.values()];
+    const distance = Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
+    const nextZoom = clamp(pinchSession.zoom * distance / Math.max(1, pinchSession.distance), MIN_ZOOM, MAX_ZOOM);
+    const midX = (a.x + b.x) / 2, midY = (a.y + b.y) / 2;
+    const rect = viewer.getBoundingClientRect();
+    state.zoom = nextZoom;
+    state.panX = midX - rect.left - rect.width / 2 - pinchSession.imageOffsetX * nextZoom;
+    state.panY = midY - rect.top - rect.height / 2 - pinchSession.imageOffsetY * nextZoom;
+    state.zoomMode = 'manual';
+    applyViewTransform();
+  } else if (panSession && panSession.pointerId === event.pointerId) {
+    state.panX = panSession.startPanX + event.clientX - panSession.x;
+    state.panY = panSession.startPanY + event.clientY - panSession.y;
+    applyViewTransform();
+  }
+});
+
+function finishPointer(event) {
+  const point = pointers.get(event.pointerId);
+  pointers.delete(event.pointerId);
+  if (panSession?.pointerId === event.pointerId) panSession = null;
+  if (pointers.size < 2) pinchSession = null;
+  if (!pointers.size) viewer.classList.remove('is-panning');
+  if (event.pointerType === 'touch' && point && state.activeTool !== 'brush') {
+    const moved = Math.hypot(point.x - point.startX, point.y - point.startY);
+    if (moved < 12) {
+      const now = performance.now();
+      if (lastTap && now - lastTap.time < 320 && Math.hypot(point.x - lastTap.x, point.y - lastTap.y) < 24) {
+        fitToView();
+        status('Artwork fit to view.');
+        lastTap = null;
+      } else {
+        lastTap = {time: now, x: point.x, y: point.y};
+      }
+    }
+  }
+}
+viewer.addEventListener('pointerup', finishPointer);
+viewer.addEventListener('pointercancel', finishPointer);
+
+window.addEventListener('keydown', event => {
+  if (event.code !== 'Space' || event.target.closest?.('input, textarea, select, button')) return;
+  if (!state.img) return;
+  event.preventDefault();
+  state.spaceDown = true;
+  updateViewerCursor();
+});
+window.addEventListener('keyup', event => {
+  if (event.code !== 'Space') return;
+  state.spaceDown = false;
+  updateViewerCursor();
+});
+window.addEventListener('blur', () => { state.spaceDown = false; updateViewerCursor(); });
+
+new ResizeObserver(() => {
+  if (!state.img) return;
+  if (state.zoomMode === 'fit') fitToView();
+  else applyViewTransform();
+}).observe(viewer);
 
 function applyThreshold(cutoff) {
   const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -223,6 +410,9 @@ function syncControls() {
   $('dotsize-value').textContent = String(state.dotsize);
   $('intensity-value').textContent = String(state.intensity);
   $('mirror').disabled = $('reset').disabled = $('compare').disabled = $('export').disabled = !state.img;
+  $('brush-tool').disabled = $('hand-tool').disabled = !state.img;
+  syncZoomControls();
+  updateViewerCursor();
   updateHistory();
 }
 
