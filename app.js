@@ -16,7 +16,7 @@ const ghostCanvas = document.createElement('canvas');
 const ghostCtx = ghostCanvas.getContext('2d', {willReadFrequently: true});
 const MIN_ZOOM = .25, MAX_ZOOM = 8;
 const UNIT_MM = {mm: 1, cm: 10, inch: 25.4};
-const DEFAULTS = {brightness: 0, contrast: 0, threshold: 0, method: 'none', dotsize: 4, intensity: 50, mirrored: false, despeckle: false, brushMode: 'break', brushSize: 12, brushStrength: 50, ghost: true, invert: false};
+const DEFAULTS = {brightness: 0, contrast: 0, threshold: 0, method: 'none', dotsize: 4, intensity: 50, mirrored: false, despeckle: false, brushMode: 'break', brushSize: 12, brushStrength: 50, ghost: true, invert: false, randomSeed: null};
 // Each preset tunes only the existing tonal and dithering controls. Mirror is
 // intentionally excluded: transfer orientation always remains the user's choice.
 const PRESETS = {
@@ -61,8 +61,8 @@ function invalidateBase() {
 
 function status(message) { $('status').textContent = message; }
 function snapshot() {
-  const {brightness, contrast, threshold, method, dotsize, intensity, mirrored, invert, despeckle} = state;
-  return {brightness, contrast, threshold, method, dotsize, intensity, mirrored, invert, despeckle, strokes: cloneStrokes(state.strokes)};
+  const {brightness, contrast, threshold, method, dotsize, intensity, mirrored, invert, despeckle, randomSeed} = state;
+  return {brightness, contrast, threshold, method, dotsize, intensity, mirrored, invert, despeckle, randomSeed, strokes: cloneStrokes(state.strokes)};
 }
 function cloneSnapshot(value) {
   return {...value, strokes: cloneStrokes(value.strokes || [])};
@@ -1120,6 +1120,42 @@ function scheduleRender() {
   state.raf = requestAnimationFrame(() => { state.raf = 0; render(); });
 }
 
+const RANDOM_METHODS = ['none', 'floyd-steinberg', 'jarvis', 'bayer', 'round-dot'];
+
+function hashField(seed, field, salt = 0) {
+  let fieldHash = 2166136261;
+  for (let i = 0; i < field.length; i++) {
+    fieldHash ^= field.charCodeAt(i);
+    fieldHash = Math.imul(fieldHash, 16777619);
+  }
+  return hashUnit(seed, fieldHash, 0, 0, salt + 2027);
+}
+
+function seededInteger(seed, field, min, max) {
+  return min + Math.floor(hashField(seed, field) * (max - min + 1));
+}
+
+function randomizedSettings(seed) {
+  return {
+    method: RANDOM_METHODS[seededInteger(seed, 'method', 0, RANDOM_METHODS.length - 1)],
+    dotsize: seededInteger(seed, 'dotsize', 2, 12),
+    intensity: seededInteger(seed, 'intensity', 25, 85),
+    brightness: seededInteger(seed, 'brightness', -30, 30),
+    contrast: seededInteger(seed, 'contrast', 20, 80),
+    threshold: seededInteger(seed, 'threshold', 20, 80)
+  };
+}
+
+function randomize(seed = seedHex()) {
+  if (!state.img) return;
+  pushHistory();
+  Object.assign(state, randomizedSettings(seed), {randomSeed: seed});
+  invalidateBase();
+  syncControls();
+  render();
+  status(`randomized · seed ${seed}`);
+}
+
 function applyPreset(id) {
   const preset = PRESETS[id];
   if (!state.img || !preset) return;
@@ -1141,6 +1177,7 @@ function syncControls() {
   $('threshold').disabled = !state.img || dithering;
   $('brush-mode').disabled = $('brush-size').disabled = $('brush-strength').disabled = $('ghost-toggle').disabled = !state.img;
   for (const button of document.querySelectorAll('[data-preset]')) button.disabled = !state.img;
+  $('randomize').disabled = !state.img;
   for (const id of ['brightness', 'contrast', 'threshold', 'dotsize', 'intensity', 'brush-size', 'brush-strength']) $(id).value = state[id];
   $('method').value = state.method;
   $('brush-mode').value = state.brushMode;
@@ -1236,6 +1273,7 @@ $('rotate-90').addEventListener('click', () => {
 for (const button of document.querySelectorAll('[data-preset]')) {
   button.addEventListener('click', () => applyPreset(button.dataset.preset));
 }
+$('randomize').addEventListener('click', () => randomize());
 $('auto-threshold').onclick = () => {
   if (!state.img || state.currentStroke) return;
   const cutoff = otsuThreshold();
@@ -1329,6 +1367,7 @@ function buildEvidence() {
   return {
     tool: 'thr4ce',
     version: 1,
+    random_seed: state.randomSeed,
     source: {
       name: state.name,
       width: state.img.width,
