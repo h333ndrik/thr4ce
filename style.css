@@ -14,6 +14,7 @@ button:disabled{opacity:.4;cursor:wait}
 .primary:hover{background:#444;color:#fff}
 .viewer{height:420px;max-height:55vh;background:#101010;position:relative;border-radius:5px;overflow:hidden;display:grid;place-items:center;touch-action:none}
 .viewer.is-panning{cursor:grabbing}
+.viewer.is-drawing{cursor:crosshair}
 .viewer.is-pan-ready{cursor:grab}
 #canvas-stage{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
 .viewer.is-dragover{outline:2px solid #b9b9c9;outline-offset:-6px}
@@ -41,6 +42,8 @@ select:disabled{opacity:.4}
 input[type=range]{width:100%;accent-color:#555;margin:10px 0 0}
 output{float:right;font-variant-numeric:tabular-nums}
 .hint{margin:6px 0 0;font-size:11px;color:#777;line-height:1.6}
+.check-row{display:flex!important;align-items:center;gap:8px;margin-top:12px}
+.check-row input{width:15px;height:15px;accent-color:#555;margin:0}
 .control-actions{justify-content:flex-start}
 footer{flex-wrap:wrap;margin-top:20px}
 .limits{font-size:11px;color:#777;line-height:1.6;margin:0}
@@ -52,6 +55,7 @@ footer{flex-wrap:wrap;margin-top:20px}
 .h4-cursor{position:fixed;left:0;top:0;width:22px;height:33px;z-index:2147483647;pointer-events:none;user-select:none;margin:0;padding:0}
 .h4-cursor img{display:block;width:100%;height:100%;transform:scale(1);transform-origin:7px 2px;transition:transform 150ms ease-out;pointer-events:none}
 .h4-cursor.is-clickable img{transform:scale(1.12)}
+
 .h4-cursor.is-clicking img{transform:scale(.94)}
 .h4-cursor.is-clickable.is-clicking img{transform:scale(1.04)}
 @media(hover:hover) and (pointer:fine){html.h4-cursor-ready,html.h4-cursor-ready *{cursor:none!important}}

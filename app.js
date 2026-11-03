@@ -5,17 +5,44 @@ const ctx = canvas.getContext('2d', {willReadFrequently: true});
 const viewer = $('viewer');
 const stage = $('canvas-stage');
 const zoomLabel = $('zoom-label');
+const brushRing = $('brush-ring');
+const baseCanvas = document.createElement('canvas');
+const baseCtx = baseCanvas.getContext('2d', {willReadFrequently: true});
+const maskCanvas = document.createElement('canvas');
+const maskCtx = maskCanvas.getContext('2d', {willReadFrequently: true});
 const MIN_ZOOM = .25, MAX_ZOOM = 8;
-const DEFAULTS = {brightness: 0, contrast: 0, threshold: 0, method: 'none', dotsize: 4, intensity: 50, mirrored: false};
-const state = {...DEFAULTS, img: null, name: '', history: [], future: [], gesture: false, comparing: false, raf: 0, zoom: 1, panX: 0, panY: 0, zoomMode: 'fit', activeTool: 'brush', spaceDown: false, renderMs: 0, renderMode: 'rgb'};
+const DEFAULTS = {brightness: 0, contrast: 0, threshold: 0, method: 'none', dotsize: 4, intensity: 50, mirrored: false, brushMode: 'break', brushSize: 12, brushStrength: 50, ghost: true, invert: false};
+const state = {...DEFAULTS, img: null, name: '', history: [], future: [], gesture: false, comparing: false, raf: 0, zoom: 1, panX: 0, panY: 0, zoomMode: 'fit', activeTool: 'brush', spaceDown: false, renderMs: 0, renderMode: 'rgb', strokes: [], currentStroke: null, strokeBefore: null, strokePointerId: null};
+let baseMask = null;
+let mask = null;
+let baseDirty = true;
+let maskDirty = true;
+
+function cloneStrokes(strokes) {
+  return strokes.map(stroke => ({
+    mode: stroke.mode,
+    radius: stroke.radius,
+    strength: stroke.strength,
+    seed: stroke.seed,
+    segments: stroke.segments.map(segment => ({x: segment.x, y: segment.y}))
+  }));
+}
+
+function invalidateBase() {
+  baseDirty = true;
+  maskDirty = true;
+}
 
 function status(message) { $('status').textContent = message; }
 function snapshot() {
-  const {brightness, contrast, threshold, method, dotsize, intensity, mirrored} = state;
-  return {brightness, contrast, threshold, method, dotsize, intensity, mirrored};
+  const {brightness, contrast, threshold, method, dotsize, intensity, mirrored, invert} = state;
+  return {brightness, contrast, threshold, method, dotsize, intensity, mirrored, invert, strokes: cloneStrokes(state.strokes)};
 }
-function pushHistory() {
-  state.history.push(snapshot());
+function cloneSnapshot(value) {
+  return {...value, strokes: cloneStrokes(value.strokes || [])};
+}
+function pushHistory(previous = snapshot()) {
+  state.history.push(cloneSnapshot(previous));
   if (state.history.length > 50) state.history.shift();
   state.future = [];
   updateHistory();
@@ -24,9 +51,27 @@ function updateHistory() {
   $('undo').disabled = !state.img || !state.history.length;
   $('redo').disabled = !state.img || !state.future.length;
 }
-function undo() { if (state.history.length) { state.future.push(snapshot()); apply(state.history.pop()); } }
-function redo() { if (state.future.length) { state.history.push(snapshot()); apply(state.future.pop()); } }
-function apply(s) { Object.assign(state, s); syncControls(); render(); status('Change applied.'); }
+function undo() {
+  if (!state.history.length) return;
+  state.future.push(snapshot());
+  apply(state.history.pop());
+}
+function redo() {
+  if (!state.future.length) return;
+  state.history.push(snapshot());
+  apply(state.future.pop());
+}
+function apply(s) {
+  state.currentStroke = null;
+  state.strokeBefore = null;
+  state.strokePointerId = null;
+  state.strokes = cloneStrokes(s.strokes || []);
+  Object.assign(state, s);
+  invalidateBase();
+  syncControls();
+  render();
+  status('Change applied.');
+}
 
 const MAX_IMPORT_BYTES = 30 * 1024 * 1024;
 const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
@@ -58,7 +103,8 @@ function importImage(file, source = 'input') {
       status('Could not read this image. Nothing changed.');
       return;
     }
-    Object.assign(state, DEFAULTS, {img, name: file.name, history: [], future: [], gesture: false, comparing: false});
+    Object.assign(state, DEFAULTS, {img, name: file.name, history: [], future: [], gesture: false, comparing: false, strokes: [], currentStroke: null, strokeBefore: null, strokePointerId: null});
+    invalidateBase();
     canvas.style.display = 'block';
     $('empty').hidden = true;
     $('preview-label').textContent = file.name;
@@ -100,28 +146,116 @@ viewer.addEventListener('drop', event => {
   importImage(event.dataTransfer.files[0], 'drop');
 });
 
-function render(original = false) {
+function render(original = false, forExport = false) {
   if (!state.img) return;
   const t0 = performance.now();
   const {img} = state;
-  if (canvas.width !== img.width) { canvas.width = img.width; canvas.height = img.height; }
-  const dithering = !original && state.method !== 'none';
-  const thresholding = !original && !dithering && state.threshold > 0;
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.filter = original ? 'none' : `brightness(${1 + state.brightness / 100}) contrast(${1 + state.contrast / 100})`;
-  if (dithering || thresholding) {
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  if (canvas.width !== img.width || canvas.height !== img.height) {
+    canvas.width = img.width;
+    canvas.height = img.height;
+    invalidateBase();
   }
-  if (!original && state.mirrored) { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); }
-  ctx.drawImage(img, 0, 0);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.filter = 'none';
-  if (dithering) applyDither(state.method, state.dotsize, state.intensity);
-  else if (thresholding) applyThreshold(state.threshold * 2.55);
+  ctx.globalAlpha = 1;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (original) {
+    ctx.drawImage(img, 0, 0);
+    state.renderMs = Math.round(performance.now() - t0);
+    state.renderMode = 'source';
+    updateImageInfo();
+    return;
+  }
+
+  ensureStencilData();
+  const stencilMode = state.method !== 'none' || state.threshold > 0 || state.strokes.length > 0 || Boolean(state.currentStroke);
+  if (stencilMode) paintMaskPreview(forExport);
+  else paintTonePreview();
+
   state.renderMs = Math.round(performance.now() - t0);
-  state.renderMode = original ? 'source' : ((dithering || thresholding) ? '1-bit' : 'rgb');
+  state.renderMode = stencilMode ? '1-bit' : 'rgb';
   updateImageInfo();
+}
+
+function ensureStencilData() {
+  if (baseDirty) {
+    buildBaseData();
+    baseDirty = false;
+    maskDirty = true;
+  }
+  if (maskDirty || !mask) rebuildAppliedMask();
+}
+
+function buildBaseData() {
+  const {img} = state;
+  baseCanvas.width = img.width;
+  baseCanvas.height = img.height;
+  baseCtx.setTransform(1, 0, 0, 1, 0, 0);
+  baseCtx.filter = `brightness(${1 + state.brightness / 100}) contrast(${1 + state.contrast / 100})`;
+  baseCtx.fillStyle = '#fff';
+  baseCtx.fillRect(0, 0, baseCanvas.width, baseCanvas.height);
+  if (state.mirrored) {
+    baseCtx.translate(baseCanvas.width, 0);
+    baseCtx.scale(-1, 1);
+  }
+  baseCtx.drawImage(img, 0, 0);
+  baseCtx.setTransform(1, 0, 0, 1, 0, 0);
+  baseCtx.filter = 'none';
+
+  if (state.method !== 'none') applyDither(baseCtx, state.method, state.dotsize, state.intensity);
+  else if (state.threshold > 0) applyThreshold(baseCtx, state.threshold * 2.55);
+
+  const pixels = baseCtx.getImageData(0, 0, baseCanvas.width, baseCanvas.height).data;
+  baseMask = new Uint8Array(baseCanvas.width * baseCanvas.height);
+  for (let i = 0, p = 0; i < pixels.length; i += 4, p++) {
+    const lum = pixels[i] * .299 + pixels[i + 1] * .587 + pixels[i + 2] * .114;
+    baseMask[p] = lum < 128 ? 1 : 0;
+  }
+}
+
+function rebuildAppliedMask() {
+  if (!baseMask|| !baseCanvas.width || !baseCanvas.height) return;
+  mask = baseMask.slice();
+  for (const stroke of state.strokes) applyStrokeToMask(stroke);
+  maskDirty = false;
+}
+
+function paintTonePreview() {
+  ctx.filter = state.invert ? 'invert(1)' : 'none';
+  ctx.drawImage(baseCanvas, 0, 0);
+  ctx.filter = 'none';
+}
+
+function paintMaskPreview(forExport = false) {
+  const w = canvas.width, h = canvas.height;
+  ctx.fillStyle = state.invert ? '#000' : '#fff';
+  ctx.fillRect(0, 0, w, h);
+  if (state.ghost && !forExport) {
+    ctx.save();
+    ctx.globalAlpha = .25;
+    if (state.mirrored) {
+      ctx.translate(w, 0);
+      ctx.scale(-1, 1);
+    }
+    ctx.drawImage(state.img, 0, 0);
+    ctx.restore();
+  }
+  if (maskCanvas.width !== w || maskCanvas.height !== h) {
+    maskCanvas.width = w;
+    maskCanvas.height = h;
+  }
+  const overlay = maskCtx.createImageData(w, h);
+  const data = overlay.data;
+  const ink = state.invert ? 255 : 0;
+  for (let p = 0; p < mask.length; p++) {
+    if (!mask[p]) continue;
+    const i = p * 4;
+    data[i] = data[i + 1] = data[i + 2] = ink;
+    data[i + 3] = 255;
+  }
+  maskCtx.putImageData(overlay, 0, 0);
+  ctx.drawImage(maskCanvas, 0, 0);
 }
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
@@ -224,6 +358,7 @@ function beginPan(pointerId, x, y) {
 }
 
 function beginPinch() {
+  if (state.currentStroke) finishBrushStroke(false);
   panSession = null;
   const [a, b] = [...pointers.values()];
   const midX = (a.x + b.x) / 2, midY = (a.y + b.y) / 2;
@@ -240,12 +375,13 @@ viewer.addEventListener('pointerdown', event => {
   pointers.set(event.pointerId, {x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY});
   if (pointers.size === 2) beginPinch();
   else if (state.activeTool === 'hand' || state.spaceDown || event.button === 1) beginPan(event.pointerId, event.clientX, event.clientY);
+  else if (state.activeTool === 'brush' && event.button === 0) beginBrushStroke(event);
 });
 
 viewer.addEventListener('pointermove', event => {
+  updateBrushRing(event);
   const point = pointers.get(event.pointerId);
   if (!point) return;
-  const oldX = point.x, oldY = point.y;
   point.x = event.clientX; point.y = event.clientY;
   if (pointers.size >= 2 && pinchSession) {
     const [a, b] = [...pointers.values()];
@@ -262,10 +398,13 @@ viewer.addEventListener('pointermove', event => {
     state.panX = panSession.startPanX + event.clientX - panSession.x;
     state.panY = panSession.startPanY + event.clientY - panSession.y;
     applyViewTransform();
+  } else if (state.currentStroke && state.strokePointerId === event.pointerId) {
+    appendBrushPoint(event);
   }
 });
 
 function finishPointer(event) {
+  if (state.currentStroke && state.strokePointerId === event.pointerId) finishBrushStroke(event.type === 'pointerup');
   const point = pointers.get(event.pointerId);
   pointers.delete(event.pointerId);
   if (panSession?.pointerId === event.pointerId) panSession = null;
@@ -287,6 +426,7 @@ function finishPointer(event) {
 }
 viewer.addEventListener('pointerup', finishPointer);
 viewer.addEventListener('pointercancel', finishPointer);
+viewer.addEventListener('pointerleave', () => { brushRing.hidden = true; });
 
 window.addEventListener('keydown', event => {
   if (event.code !== 'Space' || event.target.closest?.('input, textarea, select, button')) return;
@@ -308,20 +448,20 @@ new ResizeObserver(() => {
   else applyViewTransform();
 }).observe(viewer);
 
-function applyThreshold(cutoff) {
-  const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+function applyThreshold(target, cutoff) {
+  const data = target.getImageData(0, 0, target.canvas.width, target.canvas.height);
   const px = data.data;
   for (let i = 0; i < px.length; i += 4) {
     const lum = px[i] * .299 + px[i + 1] * .587 + px[i + 2] * .114;
     const value = lum > cutoff ? 255 : 0;
     px[i] = px[i + 1] = px[i + 2] = value;
   }
-  ctx.putImageData(data, 0, 0);
+  target.putImageData(data, 0, 0);
 }
 
-function applyDither(method, size, intensity) {
-  const w = canvas.width, h = canvas.height;
-  const src = ctx.getImageData(0, 0, w, h);
+function applyDither(target, method, size, intensity) {
+  const w = target.canvas.width, h = target.canvas.height;
+  const src = target.getImageData(0, 0, w, h);
   const d = src.data;
   const s = Math.max(1, size | 0);
   const bw = Math.ceil(w / s), bh = Math.ceil(h / s);
@@ -369,7 +509,7 @@ function applyDither(method, size, intensity) {
     for (let i = 0; i < lum.length; i++) out[i] = lum[i];
   }
 
-  const dst = ctx.createImageData(w, h);
+  const dst = target.createImageData(w, h);
   const dd = dst.data;
   for (let i = 0; i < dd.length; i += 4) { dd[i] = dd[i + 1] = dd[i + 2] = 255; dd[i + 3] = 255; }
   for (let by = 0; by < bh; by++) for (let bx = 0; bx < bw; bx++) {
@@ -389,7 +529,173 @@ function applyDither(method, size, intensity) {
         }
     }
   }
-  ctx.putImageData(dst, 0, 0);
+  target.putImageData(dst, 0, 0);
+}
+
+function seedHex() {
+  const bytes = new Uint8Array(8);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function hashUnit(seed, segmentIndex, x, y, salt = 0) {
+  let hash = 2166136261 ^ salt;
+  for (let i = 0; i < seed.length; i++) {
+    hash ^= seed.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  hash ^= segmentIndex + 0x9e3779b9;
+  hash = Math.imul(hash, 16777619);
+  hash ^= x + 0x85ebca6b;
+  hash = Math.imul(hash, 16777619);
+  hash ^= y + 0xc2b2ae35;
+  hash = Math.imul(hash, 16777619);
+  hash ^= hash >>> 16;
+  hash = Math.imul(hash, 0x85ebca6b);
+  hash ^= hash >>> 13;
+  hash = Math.imul(hash, 0xc2b2ae35);
+  hash ^= hash >>> 16;
+  return (hash >>> 0) / 4294967296;
+}
+
+function stampSegment(stroke, segment, segmentIndex) {
+  if (!mask) return;
+  const w = canvas.width, h = canvas.height;
+  const radius = Math.max(1, stroke.radius);
+  const strength = clamp(stroke.strength / 100, 0, 1);
+  if (!strength && stroke.mode !== 'restore') return;
+  const x0 = Math.max(0, Math.floor(segment.x - radius - 1));
+  const y0 = Math.max(0, Math.floor(segment.y - radius - 1));
+  const x1 = Math.min(w, Math.ceil(segment.x + radius + 2));
+  const y1 = Math.min(h, Math.ceil(segment.y + radius + 2));
+  const rw = x1 - x0, rh = y1 - y0;
+  const source = new Uint8Array(rw * rh);
+  for (let y = y0; y < y1; y++) {
+    const row = (y - y0) * rw;
+    const imageRow = y * w;
+    for (let x = x0; x < x1; x++) source[row + x - x0] = mask[imageRow + x];
+  }
+
+  for (let y = y0; y < y1; y++) {
+    for (let x = x0; x < x1; x++) {
+      const dx = x + .5 - segment.x, dy = y + .5 - segment.y;
+      const distance = Math.hypot(dx, dy);
+      if (distance > radius + .75) continue;
+      const local = (y - y0) * rw + x - x0;
+      const index = y * w + x;
+      const ink = source[local];
+      const edge = clamp(distance / radius, 0, 1);
+
+      if (stroke.mode === 'restore') {
+        if (distance <= radius + .5) mask[index] = baseMask[index];
+      } else if (stroke.mode === 'break') {
+        if (ink) {
+          const chance = strength * (.07 + .68 * Math.pow(edge, 1.55));
+          if (hashUnit(stroke.seed, segmentIndex, x, y, 11) < chance) mask[index] = 0;
+        } else if (distance > radius * .68 && hashUnit(stroke.seed, segmentIndex, x, y, 12) < strength * strength * .055) {
+          mask[index] = 1;
+        }
+      } else if (stroke.mode === 'thin') {
+        if (ink && hashUnit(stroke.seed, segmentIndex, x, y, 21) < strength * (.18 + .68 * edge)) mask[index] = 0;
+      } else if (stroke.mode === 'fatten') {
+        if (!ink && distance <= radius) {
+          let touchesInk = false;
+          for (let oy = -1; oy <= 1 && !touchesInk; oy++) {
+            const ny = y + oy;
+            if (ny < 0 || ny >= h) continue;
+            for (let ox = -1; ox <= 1; ox++) {
+              const nx = x + ox;
+              if (nx < 0 || nx >= w) continue;
+              if (mask[ny * w + nx]) { touchesInk = true; break; }
+            }
+          }
+          if (touchesInk && hashUnit(stroke.seed, segmentIndex, x, y, 31) < .3 + strength * .7) mask[index] = 1;
+        }
+      } else if (stroke.mode === 'dissolve') {
+        if (!ink) continue;
+        let onEdge = x === 0 || y === 0 || x === w - 1 || y === h - 1;
+        if (!onEdge) onEdge = !mask[index - 1] || !mask[index + 1] || !mask[index - w] || !mask[index + w];
+        if (onEdge && hashUnit(stroke.seed, segmentIndex, x, y, 41) < strength * (.28 + .62 * edge)) mask[index] = 0;
+      }
+    }
+  }
+}
+
+function applyStrokeToMask(stroke) {
+  stroke.segments.forEach((segment, index) => stampSegment(stroke, segment, index));
+}
+
+function canvasPoint(event) {
+  if (!state.img) return null;
+  const rect = canvas.getBoundingClientRect();
+  if (!rect.width || !rect.height || event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) return null;
+  return {
+    x: (event.clientX - rect.left) / rect.width * canvas.width,
+    y: (event.clientY - rect.top) / rect.height * canvas.height
+  };
+}
+
+function beginBrushStroke(event) {
+  const point = canvasPoint(event);
+  if (!point) return false;
+  ensureStencilData();
+  state.strokeBefore = snapshot();
+  state.currentStroke = {mode: state.brushMode, radius: state.brushSize, strength: state.brushStrength, seed: seedHex(), segments: [{x: point.x, y: point.y}]};
+  state.strokePointerId = event.pointerId;
+  state.gesture = true;
+  viewer.classList.add('is-drawing');
+  stampSegment(state.currentStroke, state.currentStroke.segments[0], 0);
+  scheduleRender();
+  return true;
+}
+
+function appendBrushPoint(event) {
+  if (!state.currentStroke || state.strokePointerId !== event.pointerId) return;
+  const point = canvasPoint(event);
+  if (!point) return;
+  const segments = state.currentStroke.segments;
+  const previous = segments[segments.length - 1];
+  const spacing = Math.max(1, state.currentStroke.radius * .18);
+  if (Math.hypot(point.x - previous.x, point.y - previous.y) < spacing) return;
+  segments.push(point);
+  stampSegment(state.currentStroke, point, segments.length - 1);
+  scheduleRender();
+}
+
+function finishBrushStroke(commit) {
+  if (!state.currentStroke) return;
+  const stroke = state.currentStroke;
+  const before = state.strokeBefore;
+  state.currentStroke = null;
+  state.strokePointerId = null;
+  state.strokeBefore = null;
+  state.gesture = false;
+  viewer.classList.remove('is-drawing');
+  if (commit && stroke.segments.length && before) {
+    state.strokes.push(stroke);
+    pushHistory(before);
+    maskDirty = true;
+    render();
+    status(`${stroke.mode.charAt(0).toUpperCase() + stroke.mode.slice(1)} stroke applied.`);
+  } else {
+    maskDirty = true;
+    render();
+  }
+}
+
+function updateBrushRing(event) {
+  const point = canvasPoint(event);
+  if (!point || state.activeTool !== 'brush' || state.spaceDown || panSession || pinchSession) {
+    brushRing.hidden = true;
+    return;
+  }
+  const viewerRect = viewer.getBoundingClientRect();
+  const diameter = Math.max(2, state.brushSize * 2 * state.zoom);
+  brushRing.hidden = false;
+  brushRing.style.width = `${diameter}px`;
+  brushRing.style.height = `${diameter}px`;
+  brushRing.style.left = `${event.clientX - viewerRect.left}px`;
+  brushRing.style.top = `${event.clientY - viewerRect.top}px`;
 }
 
 function scheduleRender() {
@@ -403,12 +709,17 @@ function syncControls() {
   $('method').disabled = !state.img;
   $('dotsize').disabled = $('intensity').disabled = !state.img || !dithering;
   $('threshold').disabled = !state.img || dithering;
-  for (const id of ['brightness', 'contrast', 'threshold', 'dotsize', 'intensity']) $(id).value = state[id];
+  $('brush-mode').disabled = $('brush-size').disabled = $('brush-strength').disabled = $('ghost-toggle').disabled = !state.img;
+  for (const id of ['brightness', 'contrast', 'threshold', 'dotsize', 'intensity', 'brush-size', 'brush-strength']) $(id).value = state[id];
+  $('brush-mode').value = state.brushMode;
+  $('ghost-toggle').checked = state.ghost;
   $('threshold-value').textContent = dithering ? '—' : (state.threshold ? String(state.threshold) : 'off');
   $('brightness-value').textContent = String(state.brightness);
   $('contrast-value').textContent = String(state.contrast);
   $('dotsize-value').textContent = String(state.dotsize);
   $('intensity-value').textContent = String(state.intensity);
+  $('brush-size-value').textContent = String(state.brushSize);
+  $('brush-strength-value').textContent = String(state.brushStrength);
   $('mirror').disabled = $('reset').disabled = $('compare').disabled = $('export').disabled = !state.img;
   $('brush-tool').disabled = $('hand-tool').disabled = !state.img;
   syncZoomControls();
@@ -420,6 +731,7 @@ for (const id of ['brightness', 'contrast', 'threshold', 'dotsize', 'intensity']
   $(id).addEventListener('input', () => {
     if (!state.gesture) { pushHistory(); state.gesture = true; }
     state[id] = Number($(id).value);
+    invalidateBase();
     syncControls(); scheduleRender();
   });
   $(id).addEventListener('change', () => { state.gesture = false; });
@@ -427,10 +739,36 @@ for (const id of ['brightness', 'contrast', 'threshold', 'dotsize', 'intensity']
 $('method').addEventListener('change', () => {
   pushHistory();
   state.method = $('method').value;
+  invalidateBase();
   syncControls(); scheduleRender();
 });
-$('mirror').onclick = () => { pushHistory(); state.mirrored = !state.mirrored; syncControls(); render(); status(state.mirrored ? 'Mirrored for transfer.' : 'Mirror off.'); };
-$('reset').onclick = () => { pushHistory(); Object.assign(state, DEFAULTS); syncControls(); render(); status('Settings reset.'); };
+$('mirror').onclick = () => { pushHistory(); state.mirrored = !state.mirrored; invalidateBase(); syncControls(); render(); status(state.mirrored ? 'Mirrored for transfer.' : 'Mirror off.'); };
+$('brush-mode').addEventListener('change', () => {
+  state.brushMode = $('brush-mode').value;
+  status(`${state.brushMode.charAt(0).toUpperCase() + state.brushMode.slice(1)} brush selected.`);
+});
+for (const id of ['brush-size', 'brush-strength']) {
+  $(id).addEventListener('input', () => {
+    state[id === 'brush-size' ? 'brushSize' : 'brushStrength'] = Number($(id).value);
+    syncControls();
+  });
+}
+$('ghost-toggle').addEventListener('change', () => {
+  state.ghost = $('ghost-toggle').checked;
+  render();
+});
+$('reset').onclick = () => {
+  pushHistory();
+  state.strokes = [];
+  state.currentStroke = null;
+  state.strokeBefore = null;
+  state.strokePointerId = null;
+  Object.assign(state, DEFAULTS);
+  invalidateBase();
+  syncControls();
+  render();
+  status('Settings reset.');
+};
 $('undo').onclick = undo;
 $('redo').onclick = redo;
 window.addEventListener('keydown', event => {
@@ -454,8 +792,10 @@ window.addEventListener('pointercancel', () => {
   render();
 }, {passive: true});
 $('export').onclick = () => {
-  render();
+  if (state.currentStroke) finishBrushStroke(true);
+  render(false, true);
   canvas.toBlob(blob => {
+    render();
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = state.name.replace(/\.[^.]+$/, '') + '-stencil.png';

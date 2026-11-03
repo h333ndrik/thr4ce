@@ -16,6 +16,8 @@ The editor is dependency-free and runs directly in the browser. No build step is
 - Adjust brightness, contrast, and black-and-white threshold.
 - Convert artwork with Floyd–Steinberg, Jarvis–Judice–Ninke, Bayer, or round-dot halftone dithering.
 - Mirror artwork for stencil transfer.
+- Refine the binary mask with Break, Thin, Fatten, Dissolve, and Restore brush modes.
+- Replay brush strokes deterministically from a recorded seed and path.
 - Zoom from 25–800%, fit to view, and pan with the Hand tool or Space-drag.
 - Pinch to zoom and double-click or double-tap to fit.
 - Compare against the untouched source for as long as the compare control is held.

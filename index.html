@@ -80,6 +80,26 @@
   </div>
 
   <div class="control-group">
+    <h2>Brush</h2>
+    <label for="brush-mode">Mode
+      <select id="brush-mode" disabled>
+        <option value="break">Break</option>
+        <option value="thin">Thin</option>
+        <option value="fatten">Fatten</option>
+        <option value="dissolve">Dissolve</option>
+        <option value="restore">Restore</option>
+      </select>
+    </label>
+    <label for="brush-size">Radius <output id="brush-size-value">12</output>
+      <input id="brush-size" type="range" min="2" max="64" step="1" value="12" disabled>
+    </label>
+    <label for="brush-strength">Strength <output id="brush-strength-value">50</output>
+      <input id="brush-strength" type="range" min="0" max="100" step="1" value="50" disabled>
+    </label>
+    <label class="check-row" for="ghost-toggle"><input id="ghost-toggle" type="checkbox" checked disabled> Ghost overlay</label>
+  </div>
+
+  <div class="control-group">
     <h2>Transform</h2>
     <div class="control-actions">
       <button id="mirror" type="button" disabled title="Flip horizontally for stencil transfer">Mirror</button>
