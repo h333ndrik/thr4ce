@@ -7,29 +7,41 @@ const stage = $('canvas-stage');
 const zoomLabel = $('zoom-label');
 const brushRing = $('brush-ring');
 const rollGuide = $('roll-guide');
+const selectionBox = $('selection-box');
 const baseCanvas = document.createElement('canvas');
 const baseCtx = baseCanvas.getContext('2d', {willReadFrequently: true});
 const maskCanvas = document.createElement('canvas');
 const maskCtx = maskCanvas.getContext('2d', {willReadFrequently: true});
+const ghostCanvas = document.createElement('canvas');
+const ghostCtx = ghostCanvas.getContext('2d', {willReadFrequently: true});
 const MIN_ZOOM = .25, MAX_ZOOM = 8;
 const UNIT_MM = {mm: 1, cm: 10, inch: 25.4};
 const DEFAULTS = {brightness: 0, contrast: 0, threshold: 0, method: 'none', dotsize: 4, intensity: 50, mirrored: false, despeckle: false, brushMode: 'break', brushSize: 12, brushStrength: 50, ghost: true, invert: false};
-const state = {...DEFAULTS, img: null, name: '', history: [], future: [], gesture: false, comparing: false, raf: 0, zoom: 1, panX: 0, panY: 0, zoomMode: 'fit', activeTool: 'brush', spaceDown: false, renderMs: 0, renderMode: 'rgb', strokes: [], currentStroke: null, strokeBefore: null, strokePointerId: null, printWidth: 100, printHeight: 75, printUnit: 'mm', dpiPreset: '203', customDpi: 300, rotate90: false, sourceHash: null};
+const state = {...DEFAULTS, img: null, name: '', history: [], future: [], gesture: false, comparing: false, raf: 0, zoom: 1, panX: 0, panY: 0, zoomMode: 'fit', activeTool: 'brush', spaceDown: false, renderMs: 0, renderMode: 'rgb', strokes: [], currentStroke: null, strokeBefore: null, strokePointerId: null, printWidth: 100, printHeight: 75, printUnit: 'mm', dpiPreset: '203', customDpi: 300, rotate90: false, sourceHash: null, selection: null, selectSession: null};
 let importSequence = 0;
 let pendingEvidence = null;
 let baseMask = null;
 let mask = null;
+let ghostMask = null;
 let baseDirty = true;
 let maskDirty = true;
 
 function cloneStrokes(strokes) {
-  return strokes.map(stroke => ({
-    mode: stroke.mode,
-    radius: stroke.radius,
-    strength: stroke.strength,
-    seed: stroke.seed,
-    segments: stroke.segments.map(segment => ({x: segment.x, y: segment.y}))
-  }));
+  return strokes.map(operation => {
+    if (operation.type === 'isolate') {
+      return {type: 'isolate', rect: {...operation.rect}, seed: operation.seed};
+    }
+    if (operation.type === 'erase') {
+      return {type: 'erase', rect: {...operation.rect}};
+    }
+    return {
+      mode: operation.mode,
+      radius: operation.radius,
+      strength: operation.strength,
+      seed: operation.seed,
+      segments: operation.segments.map(segment => ({x: segment.x, y: segment.y}))
+    };
+  });
 }
 
 function invalidateBase() {
@@ -133,7 +145,9 @@ async function importImage(file, source = 'input') {
       strokes: [],
       currentStroke: null,
       strokeBefore: null,
-      strokePointerId: null
+      strokePointerId: null,
+      selection: null,
+      selectSession: null
     });
     invalidateBase();
     canvas.style.display = 'block';
@@ -246,10 +260,37 @@ function buildBaseData() {
   }
 }
 
+function operationBounds(rect, width, height) {
+  const x0 = clamp(Math.round(rect.x), 0, width);
+  const y0 = clamp(Math.round(rect.y), 0, height);
+  const x1 = clamp(Math.round(rect.x + rect.width), x0, width);
+  const y1 = clamp(Math.round(rect.y + rect.height), y0, height);
+  return {x0, y0, x1, y1};
+}
+
+function applyTreatmentToMask(operation) {
+  const width = baseCanvas.width;
+  const {x0, y0, x1, y1} = operationBounds(operation.rect, width, baseCanvas.height);
+  for (let y = 0; y < baseCanvas.height; y++) {
+    for (let x = 0; x < width; x++) {
+      const inside = x >= x0 && x < x1 && y >= y0 && y < y1;
+      if (operation.type === 'isolate' ? !inside : inside) {
+        mask[y * width + x] = 0;
+        ghostMask[y * width + x] = 0;
+      }
+    }
+  }
+}
+
 function rebuildAppliedMask() {
   if (!baseMask|| !baseCanvas.width || !baseCanvas.height) return;
   mask = baseMask.slice();
-  for (const stroke of state.strokes) applyStrokeToMask(stroke);
+  ghostMask = new Uint8Array(mask.length);
+  ghostMask.fill(1);
+  for (const operation of state.strokes) {
+    if (operation.type === 'isolate' || operation.type === 'erase') applyTreatmentToMask(operation);
+    else applyStrokeToMask(operation);
+  }
   if (state.despeckle) removeSmallComponents(mask, baseCanvas.width, baseCanvas.height, 4);
   maskDirty = false;
 }
@@ -265,13 +306,28 @@ function paintMaskPreview(forExport = false) {
   ctx.fillStyle = state.invert ? '#000' : '#fff';
   ctx.fillRect(0, 0, w, h);
   if (state.ghost && !forExport) {
+    if (ghostCanvas.width !== w || ghostCanvas.height !== h) {
+      ghostCanvas.width = w;
+      ghostCanvas.height = h;
+    }
+    ghostCtx.setTransform(1, 0, 0, 1, 0, 0);
+    ghostCtx.clearRect(0, 0, w, h);
+    if (state.mirrored) {
+      ghostCtx.translate(w, 0);
+      ghostCtx.scale(-1, 1);
+    }
+    ghostCtx.drawImage(state.img, 0, 0);
+    ghostCtx.setTransform(1, 0, 0, 1, 0, 0);
+    if (ghostMask) {
+      const ghostPixels = ghostCtx.getImageData(0, 0, w, h);
+      for (let p = 0; p < ghostMask.length; p++) {
+        if (!ghostMask[p]) ghostPixels.data[p * 4 + 3] = 0;
+      }
+      ghostCtx.putImageData(ghostPixels, 0, 0);
+    }
     ctx.save();
     ctx.globalAlpha = .25;
-    if (state.mirrored) {
-      ctx.translate(w, 0);
-      ctx.scale(-1, 1);
-    }
-    ctx.drawImage(state.img, 0, 0);
+    ctx.drawImage(ghostCanvas, 0, 0);
     ctx.restore();
   }
   if (maskCanvas.width !== w || maskCanvas.height !== h) {
@@ -364,6 +420,7 @@ function applyViewTransform() {
   stage.style.height = `${canvas.height}px`;
   stage.style.transform = `translate(${rect.width / 2 + state.panX}px, ${rect.height / 2 + state.panY}px) scale(${state.zoom}) translate(${-canvas.width / 2}px, ${-canvas.height / 2}px)`;
   zoomLabel.textContent = `${Math.round(state.zoom * 100)}%`;
+  updateSelectionOverlay();
   updateRollGuide();
   updateImageInfo();
   syncZoomControls();
@@ -401,15 +458,196 @@ function setZoom(nextZoom, clientX, clientY, manual = true) {
 }
 
 function selectTool(tool) {
+  if (state.activeTool === 'select' && tool !== 'select') clearSelection(false);
   state.activeTool = tool;
   $('brush-tool').setAttribute('aria-pressed', String(tool === 'brush'));
   $('hand-tool').setAttribute('aria-pressed', String(tool === 'hand'));
+  $('select-tool').setAttribute('aria-pressed', String(tool === 'select'));
   updateViewerCursor();
-  status(tool === 'hand' ? 'Hand tool active. Drag to pan.' : 'Brush tool active.');
+  updateBrushRing({clientX: -1, clientY: -1});
+  status(tool === 'hand' ? 'Hand tool active. Drag to pan.' : tool === 'select' ? 'Select tool active. Drag a rectangle.' : 'Brush tool active.');
 }
 
 function updateViewerCursor() {
   viewer.classList.toggle('is-pan-ready', Boolean(state.img) && (state.activeTool === 'hand' || state.spaceDown));
+  viewer.classList.toggle('is-selecting', Boolean(state.img) && state.activeTool === 'select');
+}
+
+function selectionStatus(rect = state.selection) {
+  if (!rect) return;
+  status(`selection ${Math.round(rect.width)} × ${Math.round(rect.height)}`);
+}
+
+function updateSelectionOverlay() {
+  const rect = state.selection;
+  const available = Boolean(state.img && rect && rect.width > 0 && rect.height > 0);
+  selectionBox.hidden = !available;
+  $('selection-actions').hidden = !Boolean(state.img && rect);
+  for (const id of ['isolate', 'erase-inside', 'crop']) $(id).disabled = !available || state.cropping;
+  if (!available) return;
+  const canvasRect = canvas.getBoundingClientRect();
+  const viewerRect = viewer.getBoundingClientRect();
+  const scaleX = canvasRect.width / canvas.width;
+  const scaleY = canvasRect.height / canvas.height;
+  selectionBox.style.left = `${canvasRect.left - viewerRect.left + rect.x * scaleX}px`;
+  selectionBox.style.top = `${canvasRect.top - viewerRect.top + rect.y * scaleY}px`;
+  selectionBox.style.width = `${Math.max(1, rect.width * scaleX)}px`;
+  selectionBox.style.height = `${Math.max(1, rect.height * scaleY)}px`;
+}
+
+function clearSelection(announce = true) {
+  state.selectSession = null;
+  state.selection = null;
+  updateSelectionOverlay();
+  if (announce && state.img) status('Selection cleared.');
+}
+
+function normalizedSelection(start, end) {
+  const x = Math.max(0, Math.min(start.x, end.x));
+  const y = Math.max(0, Math.min(start.y, end.y));
+  const right = Math.min(canvas.width, Math.max(start.x, end.x));
+  const bottom = Math.min(canvas.height, Math.max(start.y, end.y));
+  return {x, y, width: right - x, height: bottom - y};
+}
+
+function selectionPixelRect() {
+  if (!state.selection) return null;
+  const bounds = operationBounds(state.selection, canvas.width, canvas.height);
+  return {x: bounds.x0, y: bounds.y0, width: bounds.x1 - bounds.x0, height: bounds.y1 - bounds.y0};
+}
+
+function beginSelection(event) {
+  const point = canvasPoint(event);
+  if (!point) return false;
+  state.selectSession = {
+    pointerId: event.pointerId,
+    start: point,
+    previous: state.selection ? {...state.selection} : null,
+    startX: event.clientX,
+    startY: event.clientY,
+    moved: false
+  };
+  viewer.classList.add('is-selecting-rect');
+  return true;
+}
+
+function updateSelectionDrag(event) {
+  const session = state.selectSession;
+  if (!session || session.pointerId !== event.pointerId) return;
+  if (Math.hypot(event.clientX - session.startX, event.clientY - session.startY) < 2) return;
+  const rect = canvas.getBoundingClientRect();
+  const point = {
+    x: clamp((event.clientX - rect.left) / rect.width * canvas.width, 0, canvas.width),
+    y: clamp((event.clientY - rect.top) / rect.height * canvas.height, 0, canvas.height)
+  };
+  session.moved = true;
+  state.selection = normalizedSelection(session.start, point);
+  updateSelectionOverlay();
+  selectionStatus(state.selection);
+}
+
+function finishSelection(event) {
+  const session = state.selectSession;
+  if (!session || session.pointerId !== event.pointerId) return;
+  state.selectSession = null;
+  viewer.classList.remove('is-selecting-rect');
+  if (event.type !== 'pointerup') {
+    state.selection = session.previous;
+    updateSelectionOverlay();
+    return;
+  }
+  if (!session.moved) {
+    if (session.previous && !pointInSelection(session.start, session.previous)) clearSelection();
+    else {
+      state.selection = session.previous;
+      updateSelectionOverlay();
+      if (state.selection) selectionStatus();
+    }
+    return;
+  }
+  const bounds = operationBounds(state.selection, canvas.width, canvas.height);
+  const rect = {x: bounds.x0, y: bounds.y0, width: bounds.x1 - bounds.x0, height: bounds.y1 - bounds.y0};
+  if (!rect.width || !rect.height) {
+    state.selection = session.previous;
+    updateSelectionOverlay();
+    return;
+  }
+  state.selection = rect;
+  updateSelectionOverlay();
+  selectionStatus(rect);
+}
+
+function pointInSelection(point, rect) {
+  return point.x >= rect.x && point.x <= rect.x + rect.width && point.y >= rect.y && point.y <= rect.y + rect.height;
+}
+
+function cancelSelectionDrag() {
+  if (!state.selectSession) return;
+  state.selection = state.selectSession.previous;
+  state.selectSession = null;
+  viewer.classList.remove('is-selecting-rect');
+  updateSelectionOverlay();
+}
+
+function applySelectionTreatment(type) {
+  if (!state.img || !state.selection || state.cropping) return;
+  const rect = selectionPixelRect();
+  if (!rect || !rect.width || !rect.height) return;
+  pushHistory();
+  const operation = type === 'isolate'
+    ? {type: 'isolate', rect, seed: seedHex()}
+    : {type: 'erase', rect};
+  state.strokes.push(operation);
+  maskDirty = true;
+  render();
+  status(`${type === 'isolate' ? 'Isolated' : 'Erased inside'} ${rect.width} × ${rect.height}.`);
+}
+
+async function cropSelection() {
+  if (!state.img || !state.selection || state.cropping) return;
+  const rect = selectionPixelRect();
+  if (!rect || !rect.width || !rect.height) return;
+  state.cropping = true;
+  updateSelectionOverlay();
+  try {
+    render(false, true);
+    const cropped = document.createElement('canvas');
+    cropped.width = rect.width;
+    cropped.height = rect.height;
+    cropped.getContext('2d').drawImage(canvas, rect.x, rect.y, rect.width, rect.height, 0, 0, rect.width, rect.height);
+    let croppedHash = state.sourceHash;
+    const blob = await new Promise(resolve => cropped.toBlob(resolve, 'image/png'));
+    if (blob) croppedHash = await sha256Hex(await blob.arrayBuffer());
+    const name = state.name;
+    Object.assign(state, DEFAULTS, {
+      img: cropped,
+      name,
+      sourceHash: croppedHash,
+      history: [],
+      future: [],
+      gesture: false,
+      comparing: false,
+      strokes: [],
+      currentStroke: null,
+      strokeBefore: null,
+      strokePointerId: null,
+      selection: null,
+      selectSession: null
+    });
+    invalidateBase();
+    syncControls();
+    render();
+    fitToView();
+    updateHistory();
+    updateSelectionOverlay();
+    status(`Cropped to ${cropped.width} × ${cropped.height}.`);
+  } catch (error) {
+    render();
+    status('Crop failed. Nothing changed.');
+  } finally {
+    state.cropping = false;
+    updateSelectionOverlay();
+  }
 }
 
 $('zoom-out').onclick = () => setZoom(state.zoom / 1.25);
@@ -417,6 +655,10 @@ $('zoom-in').onclick = () => setZoom(state.zoom * 1.25);
 $('zoom-fit').onclick = () => { fitToView(); status('Artwork fit to view.'); };
 $('brush-tool').onclick = () => selectTool('brush');
 $('hand-tool').onclick = () => selectTool('hand');
+$('select-tool').onclick = () => selectTool('select');
+$('isolate').onclick = () => applySelectionTreatment('isolate');
+$('erase-inside').onclick = () => applySelectionTreatment('erase');
+$('crop').onclick = cropSelection;
 
 viewer.addEventListener('wheel', event => {
   if (!state.img) return;
@@ -443,6 +685,7 @@ function beginPan(pointerId, x, y) {
 
 function beginPinch() {
   if (state.currentStroke) finishBrushStroke(false);
+  cancelSelectionDrag();
   panSession = null;
   const [a, b] = [...pointers.values()];
   const midX = (a.x + b.x) / 2, midY = (a.y + b.y) / 2;
@@ -455,15 +698,20 @@ function beginPinch() {
 viewer.addEventListener('pointerdown', event => {
   if (!state.img || event.target.closest('button') || event.button === 2) return;
   event.preventDefault();
-  viewer.setPointerCapture?.(event.pointerId);
+  try { viewer.setPointerCapture?.(event.pointerId); } catch {}
   pointers.set(event.pointerId, {x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY});
   if (pointers.size === 2) beginPinch();
   else if (state.activeTool === 'hand' || state.spaceDown || event.button === 1) beginPan(event.pointerId, event.clientX, event.clientY);
   else if (state.activeTool === 'brush' && event.button === 0) beginBrushStroke(event);
+  else if (state.activeTool === 'select' && event.button === 0) {
+    if (canvasPoint(event)) beginSelection(event);
+    else if (state.selection) clearSelection();
+  }
 });
 
 viewer.addEventListener('pointermove', event => {
   updateBrushRing(event);
+  updateSelectionDrag(event);
   const point = pointers.get(event.pointerId);
   if (!point) return;
   point.x = event.clientX; point.y = event.clientY;
@@ -488,6 +736,7 @@ viewer.addEventListener('pointermove', event => {
 });
 
 function finishPointer(event) {
+  if (state.selectSession && state.selectSession.pointerId === event.pointerId) finishSelection(event);
   if (state.currentStroke && state.strokePointerId === event.pointerId) finishBrushStroke(event.type === 'pointerup');
   const point = pointers.get(event.pointerId);
   pointers.delete(event.pointerId);
@@ -879,7 +1128,8 @@ function syncControls() {
   $('brush-size-value').textContent = String(state.brushSize);
   $('brush-strength-value').textContent = String(state.brushStrength);
   $('mirror').disabled = $('reset').disabled = $('compare').disabled = $('export').disabled = $('auto-threshold').disabled = $('despeckle').disabled = !state.img;
-  $('brush-tool').disabled = $('hand-tool').disabled = !state.img;
+  $('brush-tool').disabled = $('hand-tool').disabled = $('select-tool').disabled = !state.img;
+  updateSelectionOverlay();
   syncZoomControls();
   syncPrintControls();
   updateViewerCursor();
@@ -986,6 +1236,8 @@ $('despeckle').onclick = () => {
 $('reset').onclick = () => {
   pushHistory();
   state.strokes = [];
+  state.selection = null;
+  state.selectSession = null;
   state.currentStroke = null;
   state.strokeBefore = null;
   state.strokePointerId = null;
@@ -993,8 +1245,14 @@ $('reset').onclick = () => {
   invalidateBase();
   syncControls();
   render();
+  updateSelectionOverlay();
   status('Settings reset.');
 };
+document.addEventListener('pointerdown', event => {
+  if (!state.selection || state.activeTool !== 'select') return;
+  if (viewer.contains(event.target) || event.target.closest?.('.preview-options')) return;
+  clearSelection();
+});
 $('download-evidence').onclick = () => {
   if (!pendingEvidence) return;
   downloadBlob(pendingEvidence.blob, pendingEvidence.name);
@@ -1003,6 +1261,11 @@ $('download-evidence').onclick = () => {
 $('undo').onclick = undo;
 $('redo').onclick = redo;
 window.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && state.selection) {
+    event.preventDefault();
+    clearSelection();
+    return;
+  }
   if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'z') return;
   event.preventDefault();
   event.shiftKey ? redo() : undo();

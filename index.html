@@ -22,6 +22,7 @@
     <canvas id="canvas"></canvas>
     <div id="roll-guide" aria-hidden="true" hidden><span>58 mm</span></div>
   </div>
+  <div id="selection-box" aria-hidden="true" hidden></div>
   <div id="brush-ring" aria-hidden="true" hidden></div>
   <div id="empty">Start with an image.<small>Import a flash to prepare it for stenciling.</small></div>
   <div class="zoom-tools" aria-label="Zoom controls">
@@ -38,6 +39,12 @@
     <div class="tool-switch" role="group" aria-label="Canvas tool">
       <button id="brush-tool" type="button" aria-pressed="true" title="Draw with the morphology brush">Brush</button>
       <button id="hand-tool" type="button" aria-pressed="false" title="Drag to pan the artwork">Hand</button>
+      <button id="select-tool" type="button" aria-pressed="false" title="Select a rectangular region">Select</button>
+    </div>
+    <div class="selection-actions" id="selection-actions" role="group" aria-label="Selection actions" hidden>
+      <button id="isolate" type="button">Isolate</button>
+      <button id="erase-inside" type="button">Erase inside</button>
+      <button id="crop" type="button">Crop</button>
     </div>
     <button id="undo" type="button" aria-label="Undo" title="Undo (Command/Ctrl Z)" disabled>↶</button>
     <button id="redo" type="button" aria-label="Redo" title="Redo (Command/Ctrl Shift Z)" disabled>↷</button>

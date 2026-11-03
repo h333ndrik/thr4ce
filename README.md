@@ -24,6 +24,8 @@ The baseline and implementation Blocks 0–6 are complete. thr4ce is dependency-
 - Compare against the untouched source while holding Compare.
 - Mirror artwork for stencil transfer.
 - Zoom from 25–800%, fit to view, and pan with Hand, Space-drag, or touch.
+- Mark rectangular regions with Select using mouse, pen, or touch.
+- Isolate a selection, erase its interior, or crop the displayed artwork to that region.
 - Pinch to zoom and double-click or double-tap to fit.
 - Undo and redo up to 50 edits.
 - Define print width and height in millimetres, centimetres, or inches.
@@ -37,6 +39,17 @@ The baseline and implementation Blocks 0–6 are complete. thr4ce is dependency-
 Set the physical width and height, choose the output resolution, and export. Pixel dimensions are calculated as `millimetres × dpi / 25.4` and rounded to whole pixels. The artwork is scaled proportionally inside the requested print area so its aspect ratio is preserved.
 
 thr4ce works with Phomemo, AirPrint, any printer — one perfect file.
+
+## Selection & Isolate
+
+Choose **Select**, then drag a rectangle over the artwork. The live selection size appears in the status line.
+
+- **Isolate** turns everything outside the rectangle into paper white. It is stored in the replayable operation list as an `isolate` treatment with a deterministic seed.
+- **Erase inside** turns the selected interior into paper white and is stored as an `erase` treatment.
+- **Crop** bakes the visible crop into a new working image, clears strokes and history, and fits the new canvas. The imported file is never modified.
+- Press Escape, click outside the selection, or switch tools to dismiss it.
+
+Isolate and Erase are each one undo step. Export always uses the current mask, so an isolated export contains no artwork outside the selected region.
 
 ## Export Evidence
 

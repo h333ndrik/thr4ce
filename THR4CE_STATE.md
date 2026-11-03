@@ -8,12 +8,13 @@
 - Block 3 morphology brush: `6f3b1fb` (`block 3: add morphology brush`).
 - Block 4 cleanup tools: `5bc5995` (`block 4: add cleanup tools`).
 - Block 5 print and export: `4ee4b3a` (`block 5: add print export`).
+- Block 6 export evidence: `16c74db` (`block 6: add export evidence`).
 - Blocks 0–6 are implemented. The app remains dependency-free and runs without a build step.
 - Source hashes, complete settings, and deterministic stroke evidence are included in the JSON export.
 - Desktop and 390 px layouts were rendered and inspected.
 
 ## Block
-- Block 6 evidence and final documentation: complete.
+- Block 7 selection and isolate: complete. Mouse and touch rectangle selection, live dimensions, Isolate and Erase treatments, Crop, Escape/outside-click/tool-switch dismissal, one-step undo, and isolated export were verified.
 
 ## In progress
 - None.

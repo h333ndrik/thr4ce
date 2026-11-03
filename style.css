@@ -14,7 +14,8 @@ button:disabled{opacity:.4;cursor:wait}
 .primary:hover{background:#444;color:#fff}
 .viewer{height:420px;max-height:55vh;background:#101010;position:relative;border-radius:5px;overflow:hidden;display:grid;place-items:center;touch-action:none}
 .viewer.is-panning{cursor:grabbing}
-.viewer.is-drawing{cursor:crosshair}
+.viewer.is-drawing,.viewer.is-selecting,.viewer.is-selecting-rect{cursor:crosshair}
+.tool-switch button + button{border-left:0}
 .viewer.is-pan-ready{cursor:grab}
 #canvas-stage{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
 .viewer.is-dragover{outline:2px solid #b9b9c9;outline-offset:-6px}
@@ -24,6 +25,7 @@ button:disabled{opacity:.4;cursor:wait}
 .zoom-tools{position:absolute;right:10px;bottom:10px;display:flex;align-items:center;gap:4px;padding:4px;background:#101010cc;border:1px solid #333;border-radius:5px;color:#aaa;font-size:10px;font-variant-numeric:tabular-nums}
 .zoom-tools button{padding:5px 7px;color:#ddd;border-color:#444}
 .zoom-tools span{min-width:42px;text-align:center}
+#selection-box{position:absolute;border:1px dashed #fff;box-shadow:0 0 0 1px #0008;pointer-events:none;z-index:4}
 #brush-ring{position:absolute;border:1px solid #fff;border-radius:50%;pointer-events:none;box-shadow:0 0 0 1px #0008;transform:translate(-50%,-50%);z-index:3}
 #empty small{display:block;color:#777;font-size:12px;margin-top:10px}
 .preview-meta{font-size:11px;color:#777;margin:10px 0 24px;font-variant-numeric:tabular-nums}
@@ -33,6 +35,8 @@ button:disabled{opacity:.4;cursor:wait}
 .tool-switch button:first-child{border-radius:4px 0 0 4px}
 .tool-switch button:last-child{border-radius:0 4px 4px 0;border-left:0}
 .tool-switch button[aria-pressed=true]{background:#252525;color:#fff;border-color:#252525}
+.selection-actions{display:flex;gap:4px}
+.selection-actions button{padding:5px 7px;border-radius:4px}
 .preview-options > button{padding:5px 9px}
 .controls{display:grid;gap:20px;padding:18px 0;border-top:1px solid #ddd;border-bottom:1px solid #ddd}
 .controls h2{margin:0 0 4px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#8a8a86;font-weight:500}
