@@ -7,14 +7,18 @@
 - Block 2 zoom and pan: `1c11522` (`block 2: add zoom and pan`).
 - Block 3 morphology brush: `6f3b1fb` (`block 3: add morphology brush`).
 - Block 4 cleanup tools: `5bc5995` (`block 4: add cleanup tools`).
-- Import now uses one shared path for picker and drag/drop, validates file type, decodeability, and the 30 MB limit, and leaves the active edit unchanged on failure.
-- Compare always renders the untouched, unmirrored original; export still renders fresh before download.
+- Block 5 print and export: `4ee4b3a` (`block 5: add print export`).
+- Blocks 0–6 are implemented. The app remains dependency-free and runs without a build step.
+- Source hashes, complete settings, and deterministic stroke evidence are included in the JSON export.
+- Desktop and 390 px layouts were rendered and inspected.
 
 ## Block
-- Block 5 print and export: complete. Physical dimensions, mm/cm/inch units, 203/300/600/custom DPI, 58 mm roll guide, live inversion, export-only 90° rotation, and exact print-pixel PNG output are implemented.
+- Block 6 evidence and final documentation: complete.
 
 ## In progress
 - None.
 
 ## Next
-- Block 6 evidence and final documentation.
+- Presets for recurring workflows.
+- Randomize with a seed.
+- `.thr4ce` project file format.

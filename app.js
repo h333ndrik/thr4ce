@@ -14,7 +14,9 @@ const maskCtx = maskCanvas.getContext('2d', {willReadFrequently: true});
 const MIN_ZOOM = .25, MAX_ZOOM = 8;
 const UNIT_MM = {mm: 1, cm: 10, inch: 25.4};
 const DEFAULTS = {brightness: 0, contrast: 0, threshold: 0, method: 'none', dotsize: 4, intensity: 50, mirrored: false, despeckle: false, brushMode: 'break', brushSize: 12, brushStrength: 50, ghost: true, invert: false};
-const state = {...DEFAULTS, img: null, name: '', history: [], future: [], gesture: false, comparing: false, raf: 0, zoom: 1, panX: 0, panY: 0, zoomMode: 'fit', activeTool: 'brush', spaceDown: false, renderMs: 0, renderMode: 'rgb', strokes: [], currentStroke: null, strokeBefore: null, strokePointerId: null, printWidth: 100, printHeight: 75, printUnit: 'mm', dpiPreset: '203', customDpi: 300, rotate90: false};
+const state = {...DEFAULTS, img: null, name: '', history: [], future: [], gesture: false, comparing: false, raf: 0, zoom: 1, panX: 0, panY: 0, zoomMode: 'fit', activeTool: 'brush', spaceDown: false, renderMs: 0, renderMode: 'rgb', strokes: [], currentStroke: null, strokeBefore: null, strokePointerId: null, printWidth: 100, printHeight: 75, printUnit: 'mm', dpiPreset: '203', customDpi: 300, rotate90: false, sourceHash: null};
+let importSequence = 0;
+let pendingEvidence = null;
 let baseMask = null;
 let mask = null;
 let baseDirty = true;
@@ -79,7 +81,22 @@ const MAX_IMPORT_BYTES = 30 * 1024 * 1024;
 const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 const IMAGE_EXTENSIONS = /\.(png|jpe?g|webp)$/i;
 
-function importImage(file, source = 'input') {
+function loadImage(url) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('image decode failed'));
+    image.src = url;
+  });
+}
+
+async function sha256Hex(buffer) {
+  if (!crypto.subtle) throw new Error('Web Crypto is unavailable');
+  const digest = await crypto.subtle.digest('SHA-256', buffer);
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function importImage(file, source = 'input') {
   if (source === 'drop' && state.gesture) {
     status('Finish the current edit before importing another image.');
     return;
@@ -97,27 +114,40 @@ function importImage(file, source = 'input') {
     status('Image is larger than 30 MB. Nothing changed.');
     return;
   }
+  const request = ++importSequence;
   const url = URL.createObjectURL(file);
-  const img = new Image();
-  img.onload = () => {
-    URL.revokeObjectURL(url);
-    if (!img.naturalWidth || !img.naturalHeight) {
-      status('Could not read this image. Nothing changed.');
-      return;
-    }
-    Object.assign(state, DEFAULTS, {img, name: file.name, history: [], future: [], gesture: false, comparing: false, strokes: [], currentStroke: null, strokeBefore: null, strokePointerId: null});
+  try {
+    status('Reading image…');
+    const [img, buffer] = await Promise.all([loadImage(url), file.arrayBuffer()]);
+    if (!img.naturalWidth || !img.naturalHeight) throw new Error('empty image');
+    const sourceHash = await sha256Hex(buffer);
+    if (request !== importSequence) return;
+    Object.assign(state, DEFAULTS, {
+      img,
+      name: file.name,
+      sourceHash,
+      history: [],
+      future: [],
+      gesture: false,
+      comparing: false,
+      strokes: [],
+      currentStroke: null,
+      strokeBefore: null,
+      strokePointerId: null
+    });
     invalidateBase();
     canvas.style.display = 'block';
     $('empty').hidden = true;
     $('preview-label').textContent = file.name;
-    syncControls(); render(); fitToView();
+    syncControls();
+    render();
+    fitToView();
     status('Image ready. Adjust, then export for stencil transfer.');
-  };
-  img.onerror = () => {
+  } catch (error) {
+    if (request === importSequence) status('Could not read this image. Nothing changed.');
+  } finally {
     URL.revokeObjectURL(url);
-    status('Could not read this image. Nothing changed.');
-  };
-  img.src = url;
+  }
 }
 
 $('file').onchange = event => {
@@ -464,7 +494,7 @@ function finishPointer(event) {
   if (panSession?.pointerId === event.pointerId) panSession = null;
   if (pointers.size < 2) pinchSession = null;
   if (!pointers.size) viewer.classList.remove('is-panning');
-  if (event.pointerType === 'touch' && point && state.activeTool !== 'brush') {
+  if (event.pointerType === 'touch' && point) {
     const moved = Math.hypot(point.x - point.startX, point.y - point.startY);
     if (moved < 12) {
       const now = performance.now();
@@ -758,8 +788,8 @@ function canvasPoint(event) {
   const rect = canvas.getBoundingClientRect();
   if (!rect.width || !rect.height || event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) return null;
   return {
-    x: (event.clientX - rect.left) / rect.width * canvas.width,
-    y: (event.clientY - rect.top) / rect.height * canvas.height
+    x: Math.round((event.clientX - rect.left) / rect.width * canvas.width * 100) / 100,
+    y: Math.round((event.clientY - rect.top) / rect.height * canvas.height * 100) / 100
   };
 }
 
@@ -965,6 +995,11 @@ $('reset').onclick = () => {
   render();
   status('Settings reset.');
 };
+$('download-evidence').onclick = () => {
+  if (!pendingEvidence) return;
+  downloadBlob(pendingEvidence.blob, pendingEvidence.name);
+  status(`Preparing ${pendingEvidence.name}.`);
+};
 $('undo').onclick = undo;
 $('redo').onclick = redo;
 window.addEventListener('keydown', event => {
@@ -987,6 +1022,58 @@ window.addEventListener('pointercancel', () => {
   state.comparing = false;
   render();
 }, {passive: true});
+function downloadBlob(blob, filename, delay = 0) {
+  setTimeout(() => {
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  }, delay);
+}
+
+function buildEvidence() {
+  const pixels = printPixels();
+  return {
+    tool: 'thr4ce',
+    version: 1,
+    source: {
+      name: state.name,
+      width: state.img.width,
+      height: state.img.height,
+      sha256: state.sourceHash
+    },
+    settings: {
+      brightness: state.brightness,
+      contrast: state.contrast,
+      threshold: state.threshold,
+      method: state.method,
+      dotsize: state.dotsize,
+      intensity: state.intensity,
+      mirrored: state.mirrored,
+      invert: state.invert,
+      despeckle: state.despeckle,
+      brush: {
+        mode: state.brushMode,
+        radius: state.brushSize,
+        strength: state.brushStrength,
+        ghost: state.ghost
+      },
+      print: {
+        width: state.printWidth,
+        height: state.printHeight,
+        unit: state.printUnit,
+        dpi: pixels.dpi,
+        pixel_width: pixels.width,
+        pixel_height: pixels.height,
+        rotate90: state.rotate90
+      }
+    },
+    strokes: cloneStrokes(state.strokes),
+    exported_at: new Date().toISOString()
+  };
+}
+
 function buildExportCanvas() {
   const {dpi, width, height} = printPixels();
   const rotated = state.rotate90;
@@ -1021,16 +1108,19 @@ $('export').onclick = () => {
   const output = buildExportCanvas();
   const dpi = Number(output.dataset.dpi);
   render();
+  const baseName = state.name.replace(/\.[^.]+$/, '');
+  const evidence = buildEvidence();
   output.toBlob(blob => {
     if (!blob) {
       status('Export failed.');
       return;
     }
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = state.name.replace(/\.[^.]+$/, '') + '-stencil.png';
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    downloadBlob(blob, `${baseName}-stencil.png`);
+    const evidenceBlob = new Blob([JSON.stringify(evidence, null, 2)], {type: 'application/json'});
+    pendingEvidence = {blob: evidenceBlob, name: `${baseName}.stencil.json`};
+    $('download-evidence').hidden = false;
+    $('download-evidence').disabled = false;
+    downloadBlob(evidenceBlob, pendingEvidence.name, 1200);
     status(`exported ${output.width} × ${output.height} @ ${dpi} dpi`);
   }, 'image/png');
 };
