@@ -6,13 +6,15 @@ const viewer = $('viewer');
 const stage = $('canvas-stage');
 const zoomLabel = $('zoom-label');
 const brushRing = $('brush-ring');
+const rollGuide = $('roll-guide');
 const baseCanvas = document.createElement('canvas');
 const baseCtx = baseCanvas.getContext('2d', {willReadFrequently: true});
 const maskCanvas = document.createElement('canvas');
 const maskCtx = maskCanvas.getContext('2d', {willReadFrequently: true});
 const MIN_ZOOM = .25, MAX_ZOOM = 8;
+const UNIT_MM = {mm: 1, cm: 10, inch: 25.4};
 const DEFAULTS = {brightness: 0, contrast: 0, threshold: 0, method: 'none', dotsize: 4, intensity: 50, mirrored: false, despeckle: false, brushMode: 'break', brushSize: 12, brushStrength: 50, ghost: true, invert: false};
-const state = {...DEFAULTS, img: null, name: '', history: [], future: [], gesture: false, comparing: false, raf: 0, zoom: 1, panX: 0, panY: 0, zoomMode: 'fit', activeTool: 'brush', spaceDown: false, renderMs: 0, renderMode: 'rgb', strokes: [], currentStroke: null, strokeBefore: null, strokePointerId: null};
+const state = {...DEFAULTS, img: null, name: '', history: [], future: [], gesture: false, comparing: false, raf: 0, zoom: 1, panX: 0, panY: 0, zoomMode: 'fit', activeTool: 'brush', spaceDown: false, renderMs: 0, renderMode: 'rgb', strokes: [], currentStroke: null, strokeBefore: null, strokePointerId: null, printWidth: 100, printHeight: 75, printUnit: 'mm', dpiPreset: '203', customDpi: 300, rotate90: false};
 let baseMask = null;
 let mask = null;
 let baseDirty = true;
@@ -269,6 +271,56 @@ function updateImageInfo() {
   $('image-info').textContent = `${state.img.width} × ${state.img.height} · ${state.renderMode} · ${state.renderMs} ms · ${Math.round(state.zoom * 100)}%`;
 }
 
+function printDpi() {
+  const custom = Number(state.customDpi);
+  if (state.dpiPreset === 'custom') return Number.isFinite(custom) ? clamp(Math.round(custom), 36, 2400) : 203;
+  return Number(state.dpiPreset) || 203;
+}
+
+function printPixels() {
+  const dpi = printDpi();
+  const widthMm = state.printWidth * UNIT_MM[state.printUnit];
+  const heightMm = state.printHeight * UNIT_MM[state.printUnit];
+  return {
+    dpi,
+    width: Math.max(1, Math.round(widthMm * dpi / 25.4)),
+    height: Math.max(1, Math.round(heightMm * dpi / 25.4))
+  };
+}
+
+function syncPrintControls() {
+  const disabled = !state.img;
+  $('print-width').disabled = $('print-height').disabled = $('print-unit').disabled = $('dpi-select').disabled = disabled;
+  $('custom-dpi').disabled = disabled || state.dpiPreset !== 'custom';
+  $('custom-dpi-label').hidden = state.dpiPreset !== 'custom';
+  $('invert-toggle').disabled = $('rotate-90').disabled = disabled;
+  $('print-width').value = String(state.printWidth);
+  $('print-height').value = String(state.printHeight);
+  $('print-unit').value = state.printUnit;
+  $('dpi-select').value = state.dpiPreset;
+  $('custom-dpi').value = String(state.customDpi);
+  $('invert-toggle').checked = state.invert;
+  $('rotate-90').setAttribute('aria-pressed', String(state.rotate90));
+  const widthCm = state.printWidth * UNIT_MM[state.printUnit] / 10;
+  const heightCm = state.printHeight * UNIT_MM[state.printUnit] / 10;
+  $('print-summary').textContent = `prints at ${widthCm.toFixed(1)} × ${heightCm.toFixed(1)} cm @ ${printDpi()} dpi`;
+  updateRollGuide();
+}
+
+function updateRollGuide() {
+  if (!state.img || !canvas.width) {
+    rollGuide.hidden = true;
+    return;
+  }
+  const {dpi, width} = printPixels();
+  const guideX = (58 * dpi / 25.4) * (canvas.width / width);
+  const visible = guideX > 0 && guideX < canvas.width;
+  rollGuide.hidden = !visible;
+  if (!visible) return;
+  rollGuide.style.left = `${guideX}px`;
+  rollGuide.style.setProperty('--inverse-zoom', String(1 / state.zoom));
+}
+
 function fitZoomValue() {
   if (!state.img) return 1;
   const rect = viewer.getBoundingClientRect();
@@ -282,6 +334,7 @@ function applyViewTransform() {
   stage.style.height = `${canvas.height}px`;
   stage.style.transform = `translate(${rect.width / 2 + state.panX}px, ${rect.height / 2 + state.panY}px) scale(${state.zoom}) translate(${-canvas.width / 2}px, ${-canvas.height / 2}px)`;
   zoomLabel.textContent = `${Math.round(state.zoom * 100)}%`;
+  updateRollGuide();
   updateImageInfo();
   syncZoomControls();
 }
@@ -798,6 +851,7 @@ function syncControls() {
   $('mirror').disabled = $('reset').disabled = $('compare').disabled = $('export').disabled = $('auto-threshold').disabled = $('despeckle').disabled = !state.img;
   $('brush-tool').disabled = $('hand-tool').disabled = !state.img;
   syncZoomControls();
+  syncPrintControls();
   updateViewerCursor();
   updateHistory();
 }
@@ -831,6 +885,47 @@ for (const id of ['brush-size', 'brush-strength']) {
 $('ghost-toggle').addEventListener('change', () => {
   state.ghost = $('ghost-toggle').checked;
   render();
+});
+$('print-width').addEventListener('input', () => {
+  state.printWidth = Math.max(.1, Number($('print-width').value) || .1);
+  syncPrintControls();
+});
+$('print-height').addEventListener('input', () => {
+  state.printHeight = Math.max(.1, Number($('print-height').value) || .1);
+  syncPrintControls();
+});
+$('print-unit').addEventListener('change', () => {
+  const previous = state.printUnit;
+  const next = $('print-unit').value;
+  if (!UNIT_MM[next]) return;
+  const millimetres = state.printWidth * UNIT_MM[previous];
+  const millimetresHeight = state.printHeight * UNIT_MM[previous];
+  state.printUnit = next;
+  state.printWidth = Math.max(.1, Math.round(millimetres / UNIT_MM[next] * 100) / 100);
+  state.printHeight = Math.max(.1, Math.round(millimetresHeight / UNIT_MM[next] * 100) / 100);
+  syncPrintControls();
+});
+$('dpi-select').addEventListener('change', () => {
+  state.dpiPreset = $('dpi-select').value;
+  syncPrintControls();
+});
+$('custom-dpi').addEventListener('input', () => {
+  state.customDpi = Number($('custom-dpi').value) || 300;
+  syncPrintControls();
+});
+$('invert-toggle').addEventListener('change', () => {
+  if (!state.img) return;
+  pushHistory();
+  state.invert = $('invert-toggle').checked;
+  syncPrintControls();
+  render();
+  status(state.invert ? 'Export inverted: white ink on black.' : 'Export inversion off.');
+});
+$('rotate-90').addEventListener('click', () => {
+  if (!state.img) return;
+  state.rotate90 = !state.rotate90;
+  syncPrintControls();
+  status(state.rotate90 ? 'Export rotation on: 90°.' : 'Export rotation off.');
 });
 $('auto-threshold').onclick = () => {
   if (!state.img || state.currentStroke) return;
@@ -892,16 +987,50 @@ window.addEventListener('pointercancel', () => {
   state.comparing = false;
   render();
 }, {passive: true});
+function buildExportCanvas() {
+  const {dpi, width, height} = printPixels();
+  const rotated = state.rotate90;
+  const output = document.createElement('canvas');
+  output.width = rotated ? height : width;
+  output.height = rotated ? width : height;
+  const target = output.getContext('2d');
+  target.imageSmoothingEnabled = true;
+  target.imageSmoothingQuality = 'high';
+  target.fillStyle = state.invert ? '#000' : '#fff';
+  target.fillRect(0, 0, output.width, output.height);
+  const scale = Math.min(width / canvas.width, height / canvas.height);
+  const drawWidth = canvas.width * scale;
+  const drawHeight = canvas.height * scale;
+  target.save();
+  if (rotated) {
+    target.translate(output.width / 2, output.height / 2);
+    target.rotate(Math.PI / 2);
+    target.drawImage(canvas, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+  } else {
+    target.drawImage(canvas, (width - drawWidth) / 2, (height - drawHeight) / 2, drawWidth, drawHeight);
+  }
+  target.restore();
+  output.dataset.dpi = String(dpi);
+  return output;
+}
+
 $('export').onclick = () => {
+  if (!state.img) return;
   if (state.currentStroke) finishBrushStroke(true);
   render(false, true);
-  canvas.toBlob(blob => {
-    render();
+  const output = buildExportCanvas();
+  const dpi = Number(output.dataset.dpi);
+  render();
+  output.toBlob(blob => {
+    if (!blob) {
+      status('Export failed.');
+      return;
+    }
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = state.name.replace(/\.[^.]+$/, '') + '-stencil.png';
     link.click();
     setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-    status('PNG exported.');
-  });
+    status(`exported ${output.width} × ${output.height} @ ${dpi} dpi`);
+  }, 'image/png');
 };

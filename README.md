@@ -20,6 +20,11 @@ The editor is dependency-free and runs directly in the browser. No build step is
 - Replay brush strokes deterministically from a recorded seed and path.
 - Set the threshold from the tonal histogram with Otsu analysis.
 - Remove isolated ink components smaller than four pixels with one deterministic despeckle step.
+- Define print width and height in millimetres, centimetres, or inches.
+- Print at 203 dpi for thermal/Phomemo output, 300 dpi, 600 dpi, or a custom resolution.
+- Preview the 58 mm roll-width guide against the artwork.
+- Invert to white ink on black and rotate the export by 90°.
+- Export a freshly rendered PNG at the exact calculated print pixel dimensions.
 - Zoom from 25–800%, fit to view, and pan with the Hand tool or Space-drag.
 - Pinch to zoom and double-click or double-tap to fit.
 - Compare against the untouched source for as long as the compare control is held.
@@ -27,6 +32,10 @@ The editor is dependency-free and runs directly in the browser. No build step is
 - Export a freshly rendered PNG at the source resolution.
 
 Images larger than 30 MB, unsupported files, and unreadable files are rejected without replacing the current edit.
+
+## Print
+
+Set the physical width and height, choose the output resolution, and export a PNG whose pixel dimensions are derived from that physical size. The artwork is fitted proportionally inside the requested print area so its aspect ratio is preserved. The 58 mm roll guide helps position work for Phomemo-style thermal printers.
 
 ## Philosophy
 

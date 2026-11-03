@@ -20,6 +20,7 @@
 <section class="viewer" id="viewer" aria-label="Artwork preview">
   <div id="canvas-stage">
     <canvas id="canvas"></canvas>
+    <div id="roll-guide" aria-hidden="true" hidden><span>58 mm</span></div>
   </div>
   <div id="brush-ring" aria-hidden="true" hidden></div>
   <div id="empty">Start with an image.<small>Import a flash to prepare it for stenciling.</small></div>
@@ -115,9 +116,42 @@
 </section>
 
 <footer>
-  <p class="limits">Non-destructive editing · originals stay untouched.</p>
-  <div class="actions">
-    <button id="export" class="primary" disabled>Export PNG ↗</button>
+  <div class="print-settings">
+    <h2>Print</h2>
+    <div class="print-fields">
+      <label for="print-width">Width <input id="print-width" type="number" min="0.1" step="0.1" value="100" disabled></label>
+      <span class="dimension-mark">×</span>
+      <label for="print-height">Height <input id="print-height" type="number" min="0.1" step="0.1" value="75" disabled></label>
+      <label for="print-unit">Unit
+        <select id="print-unit" disabled>
+          <option value="mm">mm</option>
+          <option value="cm">cm</option>
+          <option value="inch">inch</option>
+        </select>
+      </label>
+      <label for="dpi-select">Resolution
+        <select id="dpi-select" disabled>
+          <option value="203">203 Thermal · Phomemo</option>
+          <option value="300">300</option>
+          <option value="600">600</option>
+          <option value="custom">Custom</option>
+        </select>
+      </label>
+      <label for="custom-dpi" id="custom-dpi-label" hidden>DPI
+        <input id="custom-dpi" type="number" min="36" max="2400" step="1" value="300" disabled>
+      </label>
+    </div>
+    <p class="print-summary" id="print-summary">prints at 10.0 × 7.5 cm @ 203 dpi</p>
+    <div class="print-actions">
+      <label class="check-row" for="invert-toggle"><input id="invert-toggle" type="checkbox" disabled> Invert · white on black</label>
+      <button id="rotate-90" type="button" aria-pressed="false" disabled>Rotate export 90°</button>
+    </div>
+  </div>
+  <div class="footer-end">
+    <p class="limits">Non-destructive editing · originals stay untouched.</p>
+    <div class="actions">
+      <button id="export" class="primary" disabled>Export PNG ↗</button>
+    </div>
   </div>
 </footer>
 
