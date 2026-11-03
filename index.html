@@ -108,6 +108,20 @@
       </div>
 
       <div class="control-group">
+        <h3>Levels</h3>
+        <label for="black-point">Black point <output id="black-point-value">0</output>
+          <input id="black-point" type="range" min="0" max="100" step="1" value="0" disabled>
+        </label>
+        <label for="white-point">White point <output id="white-point-value">100</output>
+          <input id="white-point" type="range" min="0" max="100" step="1" value="100" disabled>
+        </label>
+        <label for="pre-blur">Pre-blur <output id="pre-blur-value">0 px</output>
+          <input id="pre-blur" type="range" min="0" max="6" step="1" value="0" disabled>
+        </label>
+        <p class="hint">Black/white point remap luminance before threshold. Blur softens scan noise — it also softens fine lines.</p>
+      </div>
+
+      <div class="control-group">
         <h3>Dithering</h3>
         <label for="method">Method
           <select id="method" disabled>

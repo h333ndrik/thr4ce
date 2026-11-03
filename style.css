@@ -68,6 +68,7 @@ button:disabled{opacity:.4;cursor:wait}
 select{display:block;width:100%;margin-top:8px;padding:8px 10px;background:#fff;border:1px solid #d2d2ce;border-radius:4px;font:inherit;color:inherit}
 select:disabled{opacity:.4}
 input[type=range]{width:100%;accent-color:#555;margin:10px 0 0}
+#black-point,#white-point,#pre-blur{height:44px;margin-top:4px}
 output{float:right;font-variant-numeric:tabular-nums}
 .hint{margin:6px 0 0;font-size:11px;color:#777;line-height:1.6}
 .preset-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}

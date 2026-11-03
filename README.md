@@ -8,7 +8,7 @@ thr4ce is a standalone, browser-based image editor for preparing tattoo flash ar
 
 **MVP 1 implemented.**
 
-The baseline and implementation Blocks 0–15 are complete. thr4ce is dependency-free, installable as a PWA, and runs directly in the browser with no build step.
+The baseline and implementation Blocks 0–15 and 17 are complete. thr4ce is dependency-free, installable as a PWA, and runs directly in the browser with no build step.
 
 ## How it works
 
@@ -26,7 +26,9 @@ Import a photo or flash artwork. Choose a threshold or dithering treatment to ma
 
 - Toggle the viewer between PHOTO and STENCIL · 1-BIT without changing settings.
 - Adjust brightness, contrast, and the black-and-white threshold.
-- Choose a threshold automatically with Otsu histogram analysis.
+- Set black and white points to remap midtones, and apply 0–6 px of pre-blur to soften scan grain.
+- Choose a threshold automatically with Otsu histogram analysis; analysis includes the active Levels and pre-blur.
+- The tone pipeline runs in a fixed order: white base → brightness/contrast → pre-blur → levels → mirror → threshold/dithering.
 - Apply Clean Stencil, Newsprint, Halftone, Xerox, Riso, and Decay workflow presets.
 - Randomize tonal and dithering settings from a reproducible 16-character seed.
 - Convert artwork with Floyd–Steinberg, Jarvis–Judice–Ninke, Bayer, or round-dot halftone dithering.
@@ -49,6 +51,12 @@ Import a photo or flash artwork. Choose a threshold or dithering treatment to ma
 - Invert to white ink on black and rotate the export by 90°.
 - Export a freshly rendered PNG at the exact physical print size.
 - Save and reopen portable `.thr4ce` project files from the header menu.
+
+## Levels & Pre-Blur
+
+Black point and white point remap luminance after brightness/contrast and before thresholding. Raising the black point deepens shadows; lowering the white point brightens highlights and increases separation. The controls stay ordered so the white point is always above the black point.
+
+Pre-blur softens scan grain before Levels, thresholding, and dithering. It also softens fine lines, so use the smallest amount that cleans the scan. Both settings are part of undo history, project files, and export evidence.
 
 ## Presets
 

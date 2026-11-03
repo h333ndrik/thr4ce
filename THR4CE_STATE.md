@@ -17,18 +17,19 @@
 - Block 12 project files: `748556b` (`block 12: project files`).
 - Block 13 coverage meter: `ff9ccc9` (`block 13: coverage meter`).
 - Block 14 final docs and live verification: `8745063` (`block 14: final docs and live verification`).
-- Blocks 0–15 are implemented. The app remains dependency-free and runs without a build step.
+- Blocks 0–15 and 17 are implemented. The app remains dependency-free and runs without a build step.
 - Source hashes, complete settings, and deterministic stroke evidence are included in the JSON export.
 - Desktop and 390 px layouts were rendered and inspected.
 
 ## Block
 - Block 15 staged flow UX: complete. Import, Make stencil, and Refine & export are grouped into three steps with a clickable PHOTO/STENCIL badge and a header project menu. Selection features remain in code but are hidden from the UI for future use.
-- Blocks 0–15 are complete.
+- Block 17 Levels and pre-blur: complete. Black/white point remapping and 0–6 px pre-blur run before threshold/dithering; Otsu uses the same adjusted base. Slider gestures are one undo step, reset is neutral, and Levels settings persist in projects and evidence.
+- Blocks 0–15 and 17 are complete.
 - Block 8 verification: `node --check` passed for `app.js`, `cursor.js`, and `sw.js`; manifest and installability errors were empty; the service worker activated and controlled the page; 192, 512, and 180 px icons rendered; Add-to-Home-Screen metadata was present; a full offline reload loaded the app from `thr4ce-v1`.
 
 ## In progress
-- None.
+- Block 18 zone treatments.
 
 ## Next
-- User feedback.
+- Complete Block 18, then user feedback.
 - Enable GitHub Pages using `DEPLOY.md`, then rerun the live PWA check.

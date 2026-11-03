@@ -18,9 +18,11 @@ const maskCanvas = document.createElement('canvas');
 const maskCtx = maskCanvas.getContext('2d', {willReadFrequently: true});
 const ghostCanvas = document.createElement('canvas');
 const ghostCtx = ghostCanvas.getContext('2d', {willReadFrequently: true});
+const mirrorCanvas = document.createElement('canvas');
+const mirrorCtx = mirrorCanvas.getContext('2d', {willReadFrequently: true});
 const MIN_ZOOM = .25, MAX_ZOOM = 8;
 const UNIT_MM = {mm: 1, cm: 10, inch: 25.4};
-const DEFAULTS = {brightness: 0, contrast: 0, threshold: 0, method: 'none', dotsize: 4, intensity: 50, mirrored: false, despeckle: false, brushMode: 'break', brushSize: 12, brushStrength: 50, ghost: true, invert: false, randomSeed: null};
+const DEFAULTS = {brightness: 0, contrast: 0, blackPoint: 0, whitePoint: 100, preBlur: 0, threshold: 0, method: 'none', dotsize: 4, intensity: 50, mirrored: false, despeckle: false, brushMode: 'break', brushSize: 12, brushStrength: 50, ghost: true, invert: false, randomSeed: null};
 // Each preset tunes only the existing tonal and dithering controls. Mirror is
 // intentionally excluded: transfer orientation always remains the user's choice.
 const PRESETS = {
@@ -65,8 +67,8 @@ function invalidateBase() {
 
 function status(message) { $('status').textContent = message; }
 function snapshot() {
-  const {brightness, contrast, threshold, method, dotsize, intensity, mirrored, invert, despeckle, randomSeed} = state;
-  return {brightness, contrast, threshold, method, dotsize, intensity, mirrored, invert, despeckle, randomSeed, strokes: cloneStrokes(state.strokes)};
+  const {brightness, contrast, blackPoint, whitePoint, preBlur, threshold, method, dotsize, intensity, mirrored, invert, despeckle, randomSeed} = state;
+  return {brightness, contrast, blackPoint, whitePoint, preBlur, threshold, method, dotsize, intensity, mirrored, invert, despeckle, randomSeed, strokes: cloneStrokes(state.strokes)};
 }
 function cloneSnapshot(value) {
   return {...value, strokes: cloneStrokes(value.strokes || [])};
@@ -281,21 +283,52 @@ function ensureStencilData() {
   if (maskDirty || !mask) rebuildAppliedMask();
 }
 
-function buildBaseData() {
-  const {img} = state;
-  baseCanvas.width = img.width;
-  baseCanvas.height = img.height;
-  baseCtx.setTransform(1, 0, 0, 1, 0, 0);
-  baseCtx.filter = `brightness(${1 + state.brightness / 100}) contrast(${1 + state.contrast / 100})`;
-  baseCtx.fillStyle = '#fff';
-  baseCtx.fillRect(0, 0, baseCanvas.width, baseCanvas.height);
-  if (state.mirrored) {
-    baseCtx.translate(baseCanvas.width, 0);
-    baseCtx.scale(-1, 1);
+function applyLevels(target, blackPoint, whitePoint) {
+  const data = target.getImageData(0, 0, target.canvas.width, target.canvas.height);
+  const pixels = data.data;
+  const black = blackPoint * 2.55;
+  const white = whitePoint * 2.55;
+  const span = Math.max(1, white - black);
+  for (let i = 0; i < pixels.length; i += 4) {
+    const lum = pixels[i] * .299 + pixels[i + 1] * .587 + pixels[i + 2] * .114;
+    const remapped = lum <= black ? 0 : lum >= white ? 255 : (lum - black) / span * 255;
+    pixels[i] = pixels[i + 1] = pixels[i + 2] = remapped;
   }
-  baseCtx.drawImage(img, 0, 0);
-  baseCtx.setTransform(1, 0, 0, 1, 0, 0);
-  baseCtx.filter = 'none';
+  target.putImageData(data, 0, 0);
+}
+
+// Canonical base pipeline:
+// white base -> brightness/contrast (filter) -> blur (filter) -> levels
+// (pixel remap) -> mirror -> threshold/dithering.
+function prepareToneCanvas(targetCanvas, targetCtx) {
+  const {img} = state;
+  targetCanvas.width = img.width;
+  targetCanvas.height = img.height;
+  targetCtx.setTransform(1, 0, 0, 1, 0, 0);
+  targetCtx.fillStyle = '#fff';
+  targetCtx.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
+  targetCtx.filter = `brightness(${1 + state.brightness / 100}) contrast(${1 + state.contrast / 100}) blur(${state.preBlur}px)`;
+  targetCtx.drawImage(img, 0, 0);
+  targetCtx.filter = 'none';
+  applyLevels(targetCtx, state.blackPoint, state.whitePoint);
+
+  if (state.mirrored) {
+    mirrorCanvas.width = targetCanvas.width;
+    mirrorCanvas.height = targetCanvas.height;
+    mirrorCtx.setTransform(1, 0, 0, 1, 0, 0);
+    mirrorCtx.clearRect(0, 0, mirrorCanvas.width, mirrorCanvas.height);
+    mirrorCtx.drawImage(targetCanvas, 0, 0);
+    targetCtx.setTransform(1, 0, 0, 1, 0, 0);
+    targetCtx.clearRect(0, 0, targetCanvas.width, targetCanvas.height);
+    targetCtx.translate(targetCanvas.width, 0);
+    targetCtx.scale(-1, 1);
+    targetCtx.drawImage(mirrorCanvas, 0, 0);
+    targetCtx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+}
+
+function buildBaseData() {
+  prepareToneCanvas(baseCanvas, baseCtx);
 
   if (state.method !== 'none') applyDither(baseCtx, state.method, state.dotsize, state.intensity);
   else if (state.threshold > 0) applyThreshold(baseCtx, state.threshold * 2.55);
@@ -899,14 +932,8 @@ function removeSmallComponents(target, width, height, minSize) {
 
 function otsuThreshold() {
   const analysis = document.createElement('canvas');
-  analysis.width = state.img.width;
-  analysis.height = state.img.height;
   const target = analysis.getContext('2d', {willReadFrequently: true});
-  target.filter = `brightness(${1 + state.brightness / 100}) contrast(${1 + state.contrast / 100})`;
-  target.fillStyle = '#fff';
-  target.fillRect(0, 0, analysis.width, analysis.height);
-  target.drawImage(state.img, 0, 0);
-  target.filter = 'none';
+  prepareToneCanvas(analysis, target);
   const pixels = target.getImageData(0, 0, analysis.width, analysis.height).data;
   const histogram = new Uint32Array(256);
   let totalSum = 0;
@@ -1240,9 +1267,36 @@ function applyPreset(id) {
   status(`preset: ${label}`);
 }
 
+for (const [id, key] of [['black-point', 'blackPoint'], ['white-point', 'whitePoint'], ['pre-blur', 'preBlur']]) {
+  $(id).addEventListener('input', () => {
+    if (!state.gesture) { pushHistory(); state.gesture = true; }
+    let value = Number($(id).value);
+    if (key === 'blackPoint') {
+      if (value >= state.whitePoint) {
+        value = Math.min(value, 99);
+        state.whitePoint = Math.min(100, value + 1);
+      }
+      state.blackPoint = value;
+    } else if (key === 'whitePoint') {
+      if (value <= state.blackPoint) {
+        value = Math.max(1, value);
+        state.blackPoint = Math.max(0, value - 1);
+      }
+      state.whitePoint = value;
+    } else {
+      state.preBlur = value;
+    }
+    state.previewPhoto = false;
+    invalidateBase();
+    syncControls();
+    scheduleRender();
+  });
+  $(id).addEventListener('change', () => { state.gesture = false; });
+}
+
 function syncControls() {
   const dithering = state.method !== 'none';
-  $('brightness').disabled = $('contrast').disabled = !state.img;
+  $('brightness').disabled = $('contrast').disabled = $('black-point').disabled = $('white-point').disabled = $('pre-blur').disabled = !state.img;
   $('method').disabled = !state.img;
   $('dotsize').disabled = $('intensity').disabled = !state.img || !dithering;
   $('threshold').disabled = !state.img || dithering;
@@ -1252,6 +1306,9 @@ function syncControls() {
   $('save-project').disabled = $('open-project').disabled = !state.img;
   $('open-project-label').classList.toggle('is-disabled', !state.img);
   for (const id of ['brightness', 'contrast', 'threshold', 'dotsize', 'intensity', 'brush-size', 'brush-strength']) $(id).value = state[id];
+  $('black-point').value = state.blackPoint;
+  $('white-point').value = state.whitePoint;
+  $('pre-blur').value = state.preBlur;
   $('method').value = state.method;
   $('brush-mode').value = state.brushMode;
   $('ghost-toggle').checked = state.ghost;
@@ -1260,6 +1317,9 @@ function syncControls() {
   $('contrast-value').textContent = String(state.contrast);
   $('dotsize-value').textContent = String(state.dotsize);
   $('intensity-value').textContent = String(state.intensity);
+  $('black-point-value').textContent = String(state.blackPoint);
+  $('white-point-value').textContent = String(state.whitePoint);
+  $('pre-blur-value').textContent = `${state.preBlur} px`;
   $('brush-size-value').textContent = String(state.brushSize);
   $('brush-strength-value').textContent = String(state.brushStrength);
   $('mirror').disabled = $('reset').disabled = $('compare').disabled = $('export').disabled = $('auto-threshold').disabled = $('despeckle').disabled = !state.img;
@@ -1461,6 +1521,11 @@ function projectSettings() {
     mirrored: state.mirrored,
     invert: state.invert,
     despeckle: state.despeckle,
+    levels: {
+      blackPoint: state.blackPoint,
+      whitePoint: state.whitePoint,
+      preBlur: state.preBlur
+    },
     random_seed: state.randomSeed,
     brush: {
       mode: state.brushMode,
@@ -1521,6 +1586,7 @@ function applyProject(project) {
   const settings = project.settings;
   const brush = settings.brush || {};
   const print = settings.print || {};
+  const levels = settings.levels || {};
   const strokes = normalizeProjectStrokes(project.strokes);
   const method = DITHER_METHODS.has(settings.method) ? settings.method : 'none';
   const brushMode = BRUSH_MODES.has(brush.mode) ? brush.mode : 'break';
@@ -1535,6 +1601,10 @@ function applyProject(project) {
       if (Number.isFinite(savedDpi)) customDpi = clamp(Math.round(savedDpi), 36, 2400);
     }
   }
+  let blackPoint = clamp(Math.round(finiteNumberOr(levels.blackPoint, 0)), 0, 99);
+  let whitePoint = clamp(Math.round(finiteNumberOr(levels.whitePoint, 100)), 1, 100);
+  if (whitePoint <= blackPoint) whitePoint = Math.min(100, blackPoint + 1);
+  if (whitePoint <= blackPoint) blackPoint = Math.max(0, whitePoint - 1);
   Object.assign(state, {
     brightness: clamp(Math.round(finiteNumberOr(settings.brightness, 0)), -100, 100),
     contrast: clamp(Math.round(finiteNumberOr(settings.contrast, 0)), -100, 100),
@@ -1545,6 +1615,9 @@ function applyProject(project) {
     mirrored: Boolean(settings.mirrored),
     invert: Boolean(settings.invert),
     despeckle: Boolean(settings.despeckle),
+    blackPoint,
+    whitePoint,
+    preBlur: clamp(Math.round(finiteNumberOr(levels.preBlur, 0)), 0, 6),
     randomSeed: typeof settings.random_seed === 'string' && /^[0-9a-f]{16}$/i.test(settings.random_seed) ? settings.random_seed : null,
     brushMode,
     brushSize: clamp(Math.round(finiteNumberOr(brush.radius, 12)), 2, 64),
@@ -1657,6 +1730,11 @@ function buildEvidence() {
       mirrored: state.mirrored,
       invert: state.invert,
       despeckle: state.despeckle,
+      levels: {
+        blackPoint: state.blackPoint,
+        whitePoint: state.whitePoint,
+        preBlur: state.preBlur
+      },
       brush: {
         mode: state.brushMode,
         radius: state.brushSize,
