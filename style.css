@@ -13,6 +13,8 @@ button:disabled{opacity:.4;cursor:wait}
 .primary{background:#252525;color:#fff;border-color:#252525}
 .primary:hover{background:#444;color:#fff}
 .viewer{height:420px;max-height:55vh;background:#101010;position:relative;border-radius:5px;overflow:hidden;display:grid;place-items:center}
+.viewer.is-dragover{outline:2px solid #b9b9c9;outline-offset:-6px}
+.viewer.is-dragover::after{content:'Drop image';position:absolute;inset:0;display:grid;place-items:center;background:#101010cc;color:#fff;font-size:13px;letter-spacing:.08em;text-transform:uppercase;pointer-events:none}
 #canvas{max-width:100%;max-height:100%;display:none}
 #empty{position:absolute;text-align:center;color:#b5b5b5;pointer-events:none;font-size:16px}
 #empty small{display:block;color:#777;font-size:12px;margin-top:10px}

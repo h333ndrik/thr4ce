@@ -1,45 +1,34 @@
 # thr4ce
-project for flash and stencil creation and editing
-# thr4ce
 
 **Image & Stencil Editor**
 
 thr4ce is a standalone, browser-based image editor for preparing tattoo flash artwork and designs for stencil printing.
 
-## Project Status
+## Status
 
-**Concept stage — no implementation yet.**
+**MVP 1 implemented.**
 
-This README outlines the project direction and potential features. It does not describe a working application or a finalized specification.
+The editor is dependency-free and runs directly in the browser. No build step is required.
 
-## Purpose
+## Features
 
-Help artists refine imported artwork and export it at the intended print size. The focus is on fast, controlled editing for stencil preparation.
+- Import PNG, JPG, and WebP images by file picker or drag and drop.
+- Adjust brightness, contrast, and black-and-white threshold.
+- Convert artwork with Floyd–Steinberg, Jarvis–Judice–Ninke, Bayer, or round-dot halftone dithering.
+- Mirror artwork for stencil transfer.
+- Compare against the untouched source for as long as the compare control is held.
+- Undo and redo up to 50 edits.
+- Export a freshly rendered PNG at the source resolution.
 
-## Planned Features
+Images larger than 30 MB, unsupported files, and unreadable files are rejected without replacing the current edit.
 
-The following features are under consideration:
+## Philosophy
 
-- Import images and tattoo flash artwork.
-- Adjust brightness, contrast, grayscale, and black-and-white threshold.
-- Refine lines and fine details for stencil printing.
-- Explore stippling and dithering with adjustable dot size and density.
-- Preserve negative space and essential design details.
-- Preview artwork at its intended physical print size.
-- Mirror designs and export at a defined scale.
-- Compare before and after edits.
-- Undo and redo changes.
-
-The initial feature set has not yet been finalized.
+thr4ce prepares the trace, not the artwork. 1-bit honesty. Break with intention. Nothing is destroyed. Local, quiet, fast.
 
 ## Design Direction
 
-- A clean, minimal interface centered on the artwork preview.
-- Easily accessible tools and precise controls.
-- Subtle, consistent interactions.
-- An organic, fluid, and experimental visual identity.
-
-The application layout will be developed using an existing video reference.
+A clean, minimal interface keeps the artwork preview central, with compact controls below it. The visual language is organic, precise, and experimental while remaining consistent with the h4 brand family.
 
 ## Brand Identity
 
@@ -53,15 +42,10 @@ thr4ce belongs to the same creative family as:
 
 thr4ce is an independent application.
 
-## Next Steps
+## Run Locally
 
-1. Define the core workflow and minimum viable feature set.
-2. Establish the layout using the video reference.
-3. Approve the scope and design direction.
-4. Prepare an implementation brief for Codex.
+Open `index.html` directly, or serve the repository directory with any static file server.
 
 ## Technology
 
-The technology stack has not yet been selected.
-
-
+Plain HTML, CSS, and JavaScript with the Canvas API. No framework, package manager, or build process.

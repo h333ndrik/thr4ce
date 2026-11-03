@@ -3,7 +3,7 @@ const $ = id => document.getElementById(id);
 const canvas = $('canvas');
 const ctx = canvas.getContext('2d', {willReadFrequently: true});
 const DEFAULTS = {brightness: 0, contrast: 0, threshold: 0, method: 'none', dotsize: 4, intensity: 50, mirrored: false};
-const state = {...DEFAULTS, img: null, name: '', history: [], future: [], gesture: false, raf: 0};
+const state = {...DEFAULTS, img: null, name: '', history: [], future: [], gesture: false, comparing: false, raf: 0};
 
 function status(message) { $('status').textContent = message; }
 function snapshot() {
@@ -24,24 +24,78 @@ function undo() { if (state.history.length) { state.future.push(snapshot()); app
 function redo() { if (state.future.length) { state.history.push(snapshot()); apply(state.future.pop()); } }
 function apply(s) { Object.assign(state, s); syncControls(); render(); status('Change applied.'); }
 
-$('file').onchange = event => {
-  const file = event.target.files[0];
-  event.target.value = '';
-  if (!file) return;
+const MAX_IMPORT_BYTES = 30 * 1024 * 1024;
+const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
+const IMAGE_EXTENSIONS = /\.(png|jpe?g|webp)$/i;
+
+function importImage(file, source = 'input') {
+  if (source === 'drop' && state.gesture) {
+    status('Finish the current edit before importing another image.');
+    return;
+  }
+  if (!file) {
+    status('No image was selected. Nothing changed.');
+    return;
+  }
+  const looksLikeImage = IMAGE_TYPES.has(file.type) || (!file.type && IMAGE_EXTENSIONS.test(file.name));
+  if (!looksLikeImage) {
+    status('That file is not a PNG, JPG, or WebP image. Nothing changed.');
+    return;
+  }
+  if (file.size > MAX_IMPORT_BYTES) {
+    status('Image is larger than 30 MB. Nothing changed.');
+    return;
+  }
   const url = URL.createObjectURL(file);
   const img = new Image();
   img.onload = () => {
     URL.revokeObjectURL(url);
-    Object.assign(state, DEFAULTS, {img, name: file.name, history: [], future: []});
+    if (!img.naturalWidth || !img.naturalHeight) {
+      status('Could not read this image. Nothing changed.');
+      return;
+    }
+    Object.assign(state, DEFAULTS, {img, name: file.name, history: [], future: [], gesture: false, comparing: false});
     canvas.style.display = 'block';
     $('empty').hidden = true;
     $('preview-label').textContent = file.name;
     syncControls(); render();
     status('Image ready. Adjust, then export for stencil transfer.');
   };
-  img.onerror = () => status('Could not read this image.');
+  img.onerror = () => {
+    URL.revokeObjectURL(url);
+    status('Could not read this image. Nothing changed.');
+  };
   img.src = url;
+}
+
+$('file').onchange = event => {
+  const file = event.target.files[0];
+  event.target.value = '';
+  importImage(file);
 };
+
+const viewer = document.querySelector('.viewer');
+let dragDepth = 0;
+viewer.addEventListener('dragenter', event => {
+  event.preventDefault();
+  dragDepth++;
+  viewer.classList.add('is-dragover');
+});
+viewer.addEventListener('dragover', event => {
+  event.preventDefault();
+  event.dataTransfer.dropEffect = state.gesture ? 'none' : 'copy';
+});
+viewer.addEventListener('dragleave', event => {
+  event.preventDefault();
+  dragDepth = Math.max(0, dragDepth - 1);
+  if (!dragDepth) viewer.classList.remove('is-dragover');
+});
+viewer.addEventListener('drop', event => {
+  event.preventDefault();
+  dragDepth = 0;
+  viewer.classList.remove('is-dragover');
+  importImage(event.dataTransfer.files[0], 'drop');
+});
 
 function render(original = false) {
   if (!state.img) return;
@@ -158,6 +212,7 @@ function scheduleRender() {
 
 function syncControls() {
   const dithering = state.method !== 'none';
+  $('brightness').disabled = $('contrast').disabled = !state.img;
   $('method').disabled = !state.img;
   $('dotsize').disabled = $('intensity').disabled = !state.img || !dithering;
   $('threshold').disabled = !state.img || dithering;
@@ -193,8 +248,21 @@ window.addEventListener('keydown', event => {
   event.preventDefault();
   event.shiftKey ? redo() : undo();
 });
-$('compare').addEventListener('pointerdown', () => render(true), {passive: true});
-window.addEventListener('pointerup', () => { if ($('compare').matches(':active')) render(); }, {passive: true});
+$('compare').addEventListener('pointerdown', () => {
+  if (!state.img) return;
+  state.comparing = true;
+  render(true);
+}, {passive: true});
+window.addEventListener('pointerup', () => {
+  if (!state.comparing) return;
+  state.comparing = false;
+  render();
+}, {passive: true});
+window.addEventListener('pointercancel', () => {
+  if (!state.comparing) return;
+  state.comparing = false;
+  render();
+}, {passive: true});
 $('export').onclick = () => {
   render();
   canvas.toBlob(blob => {

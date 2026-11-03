@@ -1,15 +1,16 @@
 # thr4ce state
 
 ## Last state
-- Baseline scaffold created from the supplied source.
-- Required files present: `index.html`, `style.css`, `cursor.js`, `app.js`, `h4-cursor.svg`.
-- No implementation changes beyond the supplied baseline.
+- Baseline scaffold: `b77503f` (`baseline scaffold`).
+- Block 0 baseline check: `21cfa41` (`block 0: baseline check`).
+- Import now uses one shared path for picker and drag/drop, validates file type, decodeability, and the 30 MB limit, and leaves the active edit unchanged on failure.
+- Compare always renders the untouched, unmirrored original; export still renders fresh before download.
 
 ## Block
-- Baseline: complete at `b77503f` (`baseline scaffold`).
+- Block 1 import robustness: complete.
 
 ## In progress
-- Block 0 baseline check. The app loads; pipeline confirmed: white base → tone filter → mirror → threshold/dithering.
+- None.
 
 ## Next
-- Block 1 import robustness.
+- Block 2 zoom and pan.
