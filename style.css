@@ -54,7 +54,12 @@ button:disabled{opacity:.4;cursor:wait}
 .tool-switch button:last-child{border-radius:0 4px 4px 0}
 .tool-switch button + button{border-left:0}
 .tool-switch button[aria-pressed=true]{background:#252525;color:#fff;border-color:#252525}
+.selection-actions{display:flex;gap:4px}
+.selection-actions button{min-height:44px;padding:5px 10px;border-radius:4px}
 .preview-options > button{padding:5px 9px}
+.zone-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.zone-list:empty{display:none}
+.zone-chip{min-height:44px;padding:8px 12px;font-variant-numeric:tabular-nums}
 .controls{display:grid;gap:0;padding:0}
 .step{border-top:1px solid #ddd;padding:18px 0}
 .step.is-locked{opacity:.42;padding-bottom:16px}

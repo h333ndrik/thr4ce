@@ -8,7 +8,7 @@ thr4ce is a standalone, browser-based image editor for preparing tattoo flash ar
 
 **MVP 1 implemented.**
 
-The baseline and implementation Blocks 0–15 and 17 are complete. thr4ce is dependency-free, installable as a PWA, and runs directly in the browser with no build step.
+The baseline and implementation Blocks 0–15, 17, and 18 are complete. thr4ce is dependency-free, installable as a PWA, and runs directly in the browser with no build step.
 
 ## How it works
 
@@ -33,6 +33,7 @@ Import a photo or flash artwork. Choose a threshold or dithering treatment to ma
 - Randomize tonal and dithering settings from a reproducible 16-character seed.
 - Convert artwork with Floyd–Steinberg, Jarvis–Judice–Ninke, Bayer, or round-dot halftone dithering.
 - Read neutral ink coverage after every rebuilt mask.
+- Select a rectangle and add up to eight zones with independent dithering or threshold settings.
 
 ### 3 · Refine & export
 
@@ -77,9 +78,17 @@ Randomize creates a new eight-byte cryptographic seed and derives method, dot si
 
 Randomize never changes mirroring, strokes, treatments, inversion, rotation, or print settings.
 
+## Zones
+
+Select a rectangle on the canvas, then choose **Add zone**. The zone snapshots the current dithering method, threshold, dot size, and intensity. Change the global method afterward to combine treatments, for example global Bayer with a round-dot zone.
+
+Zones override only the dithering treatment, not tone, Levels, pre-blur, or mirroring. Error diffusion runs inside each zone rectangle, so its error cannot spill outside. Bayer and round-dot patterns restart at the zone’s top-left corner. Zone edges can therefore show seams; that is intentional and visible.
+
+Up to eight zones are supported. Use the zone chip’s `×` to remove it. A zone must be at least 8 × 8 pixels. Add and remove actions are each one undo step.
+
 ## Project Files (.thr4ce)
 
-**Save project** writes a settings-only `.thr4ce` JSON file containing the source dimensions and SHA-256, every active setting, and all strokes and treatments. Images themselves stay with the user.
+**Save project** writes a settings-only `.thr4ce` JSON file containing the source dimensions and SHA-256, every active setting, all strokes and treatments, and the zone list. Images themselves stay with the user. Project version 1 remains compatible: files created before zones load with an empty zone list.
 
 To reopen one, import the matching source image first and choose **Open project**. thr4ce compares the current SHA-256 with the project hash. A match restores every setting and operation deterministically and starts a fresh history; a mismatch is rejected without changing the edit.
 
@@ -95,7 +104,7 @@ thr4ce works with Phomemo, AirPrint, any printer — one perfect file.
 
 ## Export Evidence
 
-Each export prepares a `<name>.stencil.json` sidecar next to the PNG. It records the source dimensions and SHA-256 hash, all tone, dithering, brush, inversion, despeckle, rotation, and print settings, plus every stroke seed and segment.
+Each export prepares a `<name>.stencil.json` sidecar next to the PNG. It records the source dimensions and SHA-256 hash, all tone, dithering, brush, inversion, despeckle, rotation, and print settings, every stroke seed and segment, and the zone list.
 
 Some browsers block a second automatic download. When that happens, the **Download .stencil.json** control remains available after export and writes the same evidence file.
 

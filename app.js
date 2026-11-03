@@ -20,7 +20,7 @@ const ghostCanvas = document.createElement('canvas');
 const ghostCtx = ghostCanvas.getContext('2d', {willReadFrequently: true});
 const mirrorCanvas = document.createElement('canvas');
 const mirrorCtx = mirrorCanvas.getContext('2d', {willReadFrequently: true});
-const MIN_ZOOM = .25, MAX_ZOOM = 8;
+const MIN_ZOOM = .25, MAX_ZOOM = 8, MAX_ZONES = 8;
 const UNIT_MM = {mm: 1, cm: 10, inch: 25.4};
 const DEFAULTS = {brightness: 0, contrast: 0, blackPoint: 0, whitePoint: 100, preBlur: 0, threshold: 0, method: 'none', dotsize: 4, intensity: 50, mirrored: false, despeckle: false, brushMode: 'break', brushSize: 12, brushStrength: 50, ghost: true, invert: false, randomSeed: null};
 // Each preset tunes only the existing tonal and dithering controls. Mirror is
@@ -33,10 +33,11 @@ const PRESETS = {
   riso: {label: 'riso', brightness: -4, contrast: 25, method: 'jarvis', dotsize: 2, intensity: 65},
   decay: {label: 'decay', brightness: -8, contrast: 35, method: 'floyd-steinberg', dotsize: 3, intensity: 80}
 };
-const state = {...DEFAULTS, img: null, name: '', history: [], future: [], gesture: false, comparing: false, raf: 0, zoom: 1, panX: 0, panY: 0, zoomMode: 'fit', activeTool: 'brush', spaceDown: false, renderMs: 0, renderMode: 'rgb', inkPercent: 0, strokes: [], currentStroke: null, strokeBefore: null, strokePointerId: null, printWidth: 100, printHeight: 75, printUnit: 'mm', dpiPreset: '203', customDpi: 300, rotate90: false, sourceHash: null, selection: null, selectSession: null, previewPhoto: false};
+const state = {...DEFAULTS, img: null, name: '', history: [], future: [], gesture: false, comparing: false, raf: 0, zoom: 1, panX: 0, panY: 0, zoomMode: 'fit', activeTool: 'brush', spaceDown: false, renderMs: 0, renderMode: 'rgb', inkPercent: 0, strokes: [], zones: [], currentStroke: null, strokeBefore: null, strokePointerId: null, printWidth: 100, printHeight: 75, printUnit: 'mm', dpiPreset: '203', customDpi: 300, rotate90: false, sourceHash: null, selection: null, selectSession: null, previewPhoto: false};
 let importSequence = 0;
 let pendingEvidence = null;
 let baseMask = null;
+let baseToneData = null;
 let mask = null;
 let ghostMask = null;
 let baseDirty = true;
@@ -60,6 +61,16 @@ function cloneStrokes(strokes) {
   });
 }
 
+function cloneZones(zones) {
+  return (zones || []).map(zone => ({
+    rect: {...zone.rect},
+    method: zone.method,
+    threshold: zone.threshold,
+    dotsize: zone.dotsize,
+    intensity: zone.intensity
+  }));
+}
+
 function invalidateBase() {
   baseDirty = true;
   maskDirty = true;
@@ -68,10 +79,10 @@ function invalidateBase() {
 function status(message) { $('status').textContent = message; }
 function snapshot() {
   const {brightness, contrast, blackPoint, whitePoint, preBlur, threshold, method, dotsize, intensity, mirrored, invert, despeckle, randomSeed} = state;
-  return {brightness, contrast, blackPoint, whitePoint, preBlur, threshold, method, dotsize, intensity, mirrored, invert, despeckle, randomSeed, strokes: cloneStrokes(state.strokes)};
+  return {brightness, contrast, blackPoint, whitePoint, preBlur, threshold, method, dotsize, intensity, mirrored, invert, despeckle, randomSeed, strokes: cloneStrokes(state.strokes), zones: cloneZones(state.zones)};
 }
 function cloneSnapshot(value) {
-  return {...value, strokes: cloneStrokes(value.strokes || [])};
+  return {...value, strokes: cloneStrokes(value.strokes || []), zones: cloneZones(value.zones || [])};
 }
 function pushHistory(previous = snapshot()) {
   state.history.push(cloneSnapshot(previous));
@@ -100,6 +111,7 @@ function apply(s) {
   state.strokePointerId = null;
   state.strokes = cloneStrokes(s.strokes || []);
   Object.assign(state, s);
+  state.zones = cloneZones(s.zones || []);
   invalidateBase();
   syncControls();
   render();
@@ -160,6 +172,7 @@ async function importImage(file, source = 'input') {
       gesture: false,
       comparing: false,
       strokes: [],
+      zones: [],
       currentStroke: null,
       strokeBefore: null,
       strokePointerId: null,
@@ -235,12 +248,12 @@ function render(original = false, forExport = false) {
   }
 
   ensureStencilData();
-  const stencilMode = state.method !== 'none' || state.threshold > 0 || state.despeckle || state.strokes.length > 0 || Boolean(state.currentStroke);
+  const stencilMode = state.method !== 'none' || state.threshold > 0 || state.despeckle || state.zones.length > 0 || state.strokes.length > 0 || Boolean(state.currentStroke);
   if (stencilMode) paintMaskPreview(forExport);
   else paintTonePreview();
 
   state.renderMs = Math.round(performance.now() - t0);
-  const modeStencil = state.method !== 'none' || state.threshold > 0;
+  const modeStencil = state.method !== 'none' || state.threshold > 0 || state.zones.length > 0;
   state.renderMode = modeStencil ? '1-bit' : 'rgb';
   updateModeBadge(false);
   updateImageInfo();
@@ -252,7 +265,7 @@ function updateModeBadge(showOriginal = false) {
     modeBadge.hidden = true;
     return;
   }
-  const stencilConfigured = state.method !== 'none' || state.threshold > 0;
+  const stencilConfigured = state.method !== 'none' || state.threshold > 0 || state.zones.length > 0;
   const photo = showOriginal || !stencilConfigured;
   modeBadge.hidden = false;
   modeBadge.textContent = photo ? 'PHOTO' : 'STENCIL · 1-BIT';
@@ -262,7 +275,7 @@ function updateModeBadge(showOriginal = false) {
 
 function toggleModeBadge() {
   if (!state.img) return;
-  const stencilConfigured = state.method !== 'none' || state.threshold > 0;
+  const stencilConfigured = state.method !== 'none' || state.threshold > 0 || state.zones.length > 0;
   if (!stencilConfigured) {
     state.previewPhoto = true;
     render();
@@ -329,6 +342,7 @@ function prepareToneCanvas(targetCanvas, targetCtx) {
 
 function buildBaseData() {
   prepareToneCanvas(baseCanvas, baseCtx);
+  baseToneData = baseCtx.getImageData(0, 0, baseCanvas.width, baseCanvas.height);
 
   if (state.method !== 'none') applyDither(baseCtx, state.method, state.dotsize, state.intensity);
   else if (state.threshold > 0) applyThreshold(baseCtx, state.threshold * 2.55);
@@ -363,9 +377,45 @@ function applyTreatmentToMask(operation) {
   }
 }
 
+// Bayer and round-dot restart at each zone's top-left corner. Error diffusion
+// runs on the zone crop only, so no quantisation error can cross its rectangle.
+function applyZonesToMask(target) {
+  if (!state.zones.length || !baseToneData) return;
+  const width = baseCanvas.width;
+  const source = baseToneData.data;
+  for (const zone of state.zones) {
+    const bounds = operationBounds(zone.rect, width, baseCanvas.height);
+    const zoneWidth = bounds.x1 - bounds.x0;
+    const zoneHeight = bounds.y1 - bounds.y0;
+    if (zoneWidth <= 0 || zoneHeight <= 0) continue;
+    const zoneCanvas = document.createElement('canvas');
+    zoneCanvas.width = zoneWidth;
+    zoneCanvas.height = zoneHeight;
+    const zoneCtx = zoneCanvas.getContext('2d', {willReadFrequently: true});
+    const zonePixels = zoneCtx.createImageData(zoneWidth, zoneHeight);
+    for (let y = 0; y < zoneHeight; y++) {
+      const sourceStart = ((bounds.y0 + y) * width + bounds.x0) * 4;
+      zonePixels.data.set(source.subarray(sourceStart, sourceStart + zoneWidth * 4), y * zoneWidth * 4);
+    }
+    zoneCtx.putImageData(zonePixels, 0, 0);
+    if (zone.method !== 'none') applyDither(zoneCtx, zone.method, zone.dotsize, zone.intensity);
+    else if (zone.threshold > 0) applyThreshold(zoneCtx, zone.threshold * 2.55);
+
+    const zoneResult = zoneCtx.getImageData(0, 0, zoneWidth, zoneHeight).data;
+    for (let y = 0; y < zoneHeight; y++) {
+      for (let x = 0; x < zoneWidth; x++) {
+        const i = (y * zoneWidth + x) * 4;
+        const lum = zoneResult[i] * .299 + zoneResult[i + 1] * .587 + zoneResult[i + 2] * .114;
+        target[(bounds.y0 + y) * width + bounds.x0 + x] = lum < 128 ? 1 : 0;
+      }
+    }
+  }
+}
+
 function rebuildAppliedMask() {
-  if (!baseMask|| !baseCanvas.width || !baseCanvas.height) return;
+  if (!baseMask || !baseCanvas.width || !baseCanvas.height) return;
   mask = baseMask.slice();
+  applyZonesToMask(mask);
   ghostMask = new Uint8Array(mask.length);
   ghostMask.fill(1);
   for (const operation of state.strokes) {
@@ -438,7 +488,8 @@ function updateImageInfo() {
     $('image-info').textContent = '—';
     return;
   }
-  $('image-info').textContent = `${state.img.width} × ${state.img.height} · ${state.renderMode} · ${state.renderMs} ms · ${Math.round(state.zoom * 100)}% · ${Math.round(state.inkPercent)}% ink`;
+  const zoneCount = state.zones.length ? ` · ${state.zones.length} ${state.zones.length === 1 ? 'zone' : 'zones'}` : '';
+  $('image-info').textContent = `${state.img.width} × ${state.img.height} · ${state.renderMode} · ${state.renderMs} ms · ${Math.round(state.zoom * 100)}% · ${Math.round(state.inkPercent)}% ink${zoneCount}`;
 }
 
 function printDpi() {
@@ -553,20 +604,21 @@ function syncStageFlow() {
 }
 
 function selectTool(tool) {
-  if (tool !== 'brush' && tool !== 'hand') return;
-  if (state.activeTool === 'select') clearSelection(false);
+  if (!['brush', 'hand', 'select'].includes(tool)) return;
+  if (tool !== 'select' && state.activeTool === 'select') clearSelection(false);
   state.activeTool = tool;
   $('brush-tool').setAttribute('aria-pressed', String(tool === 'brush'));
   $('hand-tool').setAttribute('aria-pressed', String(tool === 'hand'));
   const selectButton = $('select-tool');
-  if (selectButton) selectButton.setAttribute('aria-pressed', 'false');
+  if (selectButton) selectButton.setAttribute('aria-pressed', String(tool === 'select'));
   updateViewerCursor();
   updateBrushRing({clientX: -1, clientY: -1});
-  status(tool === 'hand' ? 'Hand tool active. Drag to pan.' : 'Brush tool active.');
+  status(tool === 'hand' ? 'Hand tool active. Drag to pan.' : tool === 'select' ? 'Select tool active. Drag a rectangle.' : 'Brush tool active.');
 }
 
 function updateViewerCursor() {
   viewer.classList.toggle('is-pan-ready', Boolean(state.img) && (state.activeTool === 'hand' || state.spaceDown));
+  viewer.classList.toggle('is-selecting', Boolean(state.img) && state.activeTool === 'select');
 }
 
 function selectionStatus(rect = state.selection) {
@@ -574,14 +626,41 @@ function selectionStatus(rect = state.selection) {
   status(`selection ${Math.round(rect.width)} × ${Math.round(rect.height)}`);
 }
 
+const ZONE_METHOD_LABELS = {
+  none: 'none',
+  'floyd-steinberg': 'Floyd–Steinberg',
+  jarvis: 'Jarvis',
+  bayer: 'Bayer',
+  'round-dot': 'Round dot'
+};
+
+function renderZones() {
+  const list = $('zone-list');
+  if (!list) return;
+  list.replaceChildren();
+  state.zones.forEach((zone, index) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'zone-chip';
+    button.dataset.zoneIndex = String(index);
+    button.title = `Remove zone ${index + 1}`;
+    button.setAttribute('aria-label', `Remove zone ${index + 1}`);
+    button.textContent = `zone ${index + 1} · ${ZONE_METHOD_LABELS[zone.method] || 'none'} · ×`;
+    list.append(button);
+  });
+  const empty = $('zone-empty');
+  if (empty) empty.hidden = state.zones.length > 0;
+}
+
 function updateSelectionOverlay() {
   const actions = $('selection-actions');
-  if (!selectionBox || !actions || !$('isolate') || !$('erase-inside') || !$('crop')) return;
+  const addZone = $('add-zone');
+  if (!selectionBox || !actions || !addZone) return;
   const rect = state.selection;
   const available = Boolean(state.img && rect && rect.width > 0 && rect.height > 0);
   selectionBox.hidden = !available;
   actions.hidden = !Boolean(state.img && rect);
-  for (const id of ['isolate', 'erase-inside', 'crop']) $(id).disabled = !available || state.cropping;
+  addZone.disabled = !available || state.cropping;
   if (!available) return;
   const canvasRect = canvas.getBoundingClientRect();
   const viewerRect = viewer.getBoundingClientRect();
@@ -612,6 +691,43 @@ function selectionPixelRect() {
   if (!state.selection) return null;
   const bounds = operationBounds(state.selection, canvas.width, canvas.height);
   return {x: bounds.x0, y: bounds.y0, width: bounds.x1 - bounds.x0, height: bounds.y1 - bounds.y0};
+}
+
+function addZoneFromSelection() {
+  if (!state.img || !state.selection) return;
+  const rect = selectionPixelRect();
+  if (!rect) return;
+  if (rect.width < 8 || rect.height < 8) {
+    status('Zone must be at least 8 × 8 px.');
+    return;
+  }
+  if (state.zones.length >= MAX_ZONES) {
+    status(`Zone limit reached (${MAX_ZONES}). Remove a zone first.`);
+    return;
+  }
+  pushHistory();
+  state.zones.push({
+    rect: {...rect},
+    method: state.method,
+    threshold: state.threshold,
+    dotsize: state.dotsize,
+    intensity: state.intensity
+  });
+  invalidateBase();
+  clearSelection(false);
+  syncControls();
+  render();
+  status(`zone ${state.zones.length} added · ${rect.width} × ${rect.height} px.`);
+}
+
+function removeZone(index) {
+  if (!Number.isInteger(index) || !state.zones[index]) return;
+  pushHistory();
+  state.zones.splice(index, 1);
+  invalidateBase();
+  syncControls();
+  render();
+  status(`zone removed · ${state.zones.length} ${state.zones.length === 1 ? 'zone' : 'zones'} left.`);
 }
 
 function beginSelection(event) {
@@ -726,6 +842,7 @@ async function cropSelection() {
       gesture: false,
       comparing: false,
       strokes: [],
+      zones: [],
       currentStroke: null,
       strokeBefore: null,
       strokePointerId: null,
@@ -765,6 +882,12 @@ $('brush-tool').onclick = () => selectTool('brush');
 $('hand-tool').onclick = () => selectTool('hand');
 const selectButton = $('select-tool');
 if (selectButton) selectButton.onclick = () => selectTool('select');
+$('add-zone').onclick = addZoneFromSelection;
+$('zone-list').addEventListener('click', event => {
+  const button = event.target.closest('[data-zone-index]');
+  if (!button) return;
+  removeZone(Number(button.dataset.zoneIndex));
+});
 const isolateButton = $('isolate');
 if (isolateButton) isolateButton.onclick = () => applySelectionTreatment('isolate');
 const eraseButton = $('erase-inside');
@@ -1324,7 +1447,8 @@ function syncControls() {
   $('brush-strength-value').textContent = String(state.brushStrength);
   $('mirror').disabled = $('reset').disabled = $('compare').disabled = $('export').disabled = $('auto-threshold').disabled = $('despeckle').disabled = !state.img;
   $('mirror').setAttribute('aria-pressed', String(state.mirrored));
-  $('brush-tool').disabled = $('hand-tool').disabled = !state.img;
+  $('brush-tool').disabled = $('hand-tool').disabled = $('select-tool').disabled = !state.img;
+  renderZones();
   syncStageFlow();
   updateModeBadge();
   updateSelectionOverlay();
@@ -1442,6 +1566,7 @@ $('reset').onclick = () => {
   pushHistory();
   state.previewPhoto = false;
   state.strokes = [];
+  state.zones = [];
   state.selection = null;
   state.selectSession = null;
   state.currentStroke = null;
@@ -1582,12 +1707,35 @@ function normalizeProjectStrokes(value) {
   });
 }
 
+function normalizeProjectZones(value) {
+  if (value == null) return [];
+  if (!Array.isArray(value)) throw new Error('Project zones must be an array.');
+  if (value.length > MAX_ZONES) throw new Error(`Project has more than ${MAX_ZONES} zones.`);
+  return value.map((zone, index) => {
+    if (!zone || typeof zone !== 'object') throw new Error(`Invalid zone ${index + 1}.`);
+    const rect = normalizedRect(zone.rect);
+    if (!rect) throw new Error(`Invalid zone ${index + 1} rectangle.`);
+    const bounds = operationBounds(rect, state.img.width, state.img.height);
+    const width = bounds.x1 - bounds.x0;
+    const height = bounds.y1 - bounds.y0;
+    if (width < 8 || height < 8) throw new Error(`Zone ${index + 1} must be at least 8 × 8 px.`);
+    return {
+      rect: {x: bounds.x0, y: bounds.y0, width, height},
+      method: DITHER_METHODS.has(zone.method) ? zone.method : 'none',
+      threshold: clamp(Math.round(finiteNumberOr(zone.threshold, 0)), 0, 100),
+      dotsize: clamp(Math.round(finiteNumberOr(zone.dotsize, 4)), 1, 16),
+      intensity: clamp(Math.round(finiteNumberOr(zone.intensity, 50)), 0, 100)
+    };
+  });
+}
+
 function applyProject(project) {
   const settings = project.settings;
   const brush = settings.brush || {};
   const print = settings.print || {};
   const levels = settings.levels || {};
   const strokes = normalizeProjectStrokes(project.strokes);
+  const zones = normalizeProjectZones(project.zones);
   const method = DITHER_METHODS.has(settings.method) ? settings.method : 'none';
   const brushMode = BRUSH_MODES.has(brush.mode) ? brush.mode : 'break';
   const printUnit = UNIT_MM[print.unit] ? print.unit : 'mm';
@@ -1630,6 +1778,7 @@ function applyProject(project) {
     customDpi,
     rotate90: Boolean(print.rotate90),
     strokes,
+    zones,
     previewPhoto: false,
     history: [],
     future: [],
@@ -1646,7 +1795,7 @@ function applyProject(project) {
   render();
   updateSelectionOverlay();
   updateHistory();
-  status(`project applied · ${strokes.length} treatments`);
+  status(`project applied · ${strokes.length} treatments · ${zones.length} ${zones.length === 1 ? 'zone' : 'zones'}`);
 }
 
 async function openProjectFile(file) {
@@ -1701,7 +1850,8 @@ function saveProjectFile() {
       sha256: state.sourceHash
     },
     settings: projectSettings(),
-    strokes: cloneStrokes(state.strokes)
+    strokes: cloneStrokes(state.strokes),
+    zones: cloneZones(state.zones)
   };
   const filename = state.name.replace(/\.[^.]+$/, '') + '.thr4ce';
   downloadBlob(new Blob([JSON.stringify(project, null, 2)], {type: 'application/json'}), filename);
@@ -1752,6 +1902,7 @@ function buildEvidence() {
       }
     },
     strokes: cloneStrokes(state.strokes),
+    zones: cloneZones(state.zones),
     exported_at: new Date().toISOString()
   };
 }
