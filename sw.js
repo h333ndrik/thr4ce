@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'thr4ce-v4';
+const CACHE_NAME = 'thr4ce-v5';
 const PRECACHE = [
   './',
   'index.html',
@@ -8,6 +8,10 @@ const PRECACHE = [
   'app.js',
   'cursor.js',
   'h4-cursor.svg',
+  'favicon.png',
+  'favicon.svg',
+  'favicon-32.png',
+  'icon.svg',
   'icon-180.png',
   'icon-192.png',
   'icon-512.png'

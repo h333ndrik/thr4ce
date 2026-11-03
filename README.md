@@ -120,6 +120,8 @@ A clean, minimal interface keeps the artwork preview central, with compact contr
 
 The official name is **thr4ce**, always lowercase.
 
+The official icon wordmark is **thr**, set lowercase in Arial/Helvetica Bold on a black tile with white lettering, following the same typographic system as the h4ngelic, h4moshlab, and m4shlab wordmarks. The black tile is icon artwork only; the app theme stays light at `#f5f5f3`. The h4 cursor remains a separate shared brand element and is unchanged.
+
 thr4ce belongs to the same creative family as:
 
 - **h4ngelic** — portfolio
