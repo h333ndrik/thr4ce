@@ -8,7 +8,7 @@ thr4ce is a standalone, browser-based image editor for preparing tattoo flash ar
 
 **MVP 1 implemented.**
 
-The baseline and implementation Blocks 0–8 are complete. thr4ce is dependency-free and runs directly in the browser with no build step.
+The baseline and implementation Blocks 0–14 are complete. thr4ce is dependency-free, installable as a PWA, and runs directly in the browser with no build step.
 
 ## Features
 
@@ -16,6 +16,10 @@ The baseline and implementation Blocks 0–8 are complete. thr4ce is dependency-
 - Reject unsupported, unreadable, or oversized files without changing the active edit.
 - Adjust brightness, contrast, and the black-and-white threshold.
 - Choose a threshold automatically with Otsu histogram analysis.
+- Apply Clean Stencil, Newsprint, Halftone, Xerox, Riso, and Decay workflow presets.
+- Randomize tonal and dithering settings from a reproducible 16-character seed.
+- Save and reopen portable `.thr4ce` project files with exact settings and operations.
+- Read neutral ink coverage for every rebuilt mask.
 - Convert artwork with Floyd–Steinberg, Jarvis–Judice–Ninke, Bayer, or round-dot halftone dithering.
 - Refine the persistent 1-bit mask with Break, Thin, Fatten, Dissolve, and Restore brush modes.
 - Replay every stroke deterministically from its recorded seed, radius, strength, and path.
@@ -33,6 +37,35 @@ The baseline and implementation Blocks 0–8 are complete. thr4ce is dependency-
 - Position artwork against the 58 mm roll-width guide.
 - Invert to white ink on black and rotate the export by 90°.
 - Export a freshly rendered PNG at the exact physical print size.
+
+## Presets
+
+Presets tune existing controls only and never change mirror orientation.
+
+- **Clean Stencil:** neutral tone, Otsu threshold, clean thresholding, despeckle.
+- **Newsprint:** round-dot halftone, dot size 5, intensity 55, brightness 8.
+- **Halftone:** round-dot halftone, dot size 8, intensity 50, brightness 12.
+- **Xerox:** Bayer grid, dot size 3, intensity 70, brightness 8, contrast 60.
+- **Riso:** Jarvis dithering, dot size 2, intensity 65, brightness -4.
+- **Decay:** Floyd–Steinberg, dot size 3, intensity 80, brightness -8.
+
+Each preset click is one undo step.
+
+## Seeded Randomize
+
+Randomize creates a new eight-byte cryptographic seed and derives method, dot size, intensity, brightness, contrast, and threshold values from it. The same seed produces the same settings. The seed appears in the status report and the exported `.stencil.json` evidence as `random_seed`.
+
+Randomize never changes mirroring, strokes, treatments, inversion, rotation, or print settings.
+
+## Project Files (.thr4ce)
+
+**Save project** writes a settings-only `.thr4ce` JSON file containing the source dimensions and SHA-256, every active setting, and all strokes and treatments. Images themselves stay with the user.
+
+To reopen one, import the matching source image first and choose **Open project**. thr4ce compares the current SHA-256 with the project hash. A match restores every setting and operation deterministically and starts a fresh history; a mismatch is rejected without changing the edit.
+
+## Coverage
+
+The image status includes the current percentage of ink pixels after every mask rebuild, for example `41% ink`. It is a neutral measurement, not a score or warning. Too dense a mask can smear during transfer; too sparse a mask can lose detail.
 
 ## Print
 
@@ -83,7 +116,7 @@ Open `index.html` directly, or serve the repository directory with any static fi
 
 ## Install (PWA)
 
-GitHub Pages deploys thr4ce at https://h333ndrik.github.io/thr4ce/.
+The project is prepared for GitHub Pages at https://h333ndrik.github.io/thr4ce/. If that URL returns **Site not found**, enable Pages for the repository using [DEPLOY.md](DEPLOY.md), then redeploy.
 
 - **iOS / iPadOS:** Open the site in Safari, tap **Share**, then **Add to Home Screen**.
 - **Android:** Open the site in Chrome, then choose **Install app**.
@@ -97,8 +130,11 @@ Full deployment steps are in [DEPLOY.md](DEPLOY.md).
 
 Plain HTML, CSS, and JavaScript with the Canvas API and Web Crypto. No framework, package manager, or build process.
 
-## Next Steps
+## Backlog (later)
 
-- Presets for recurring flash and stencil workflows.
-- Randomize with a seed for repeatable texture variations.
-- `.thr4ce` project files containing source, settings, and strokes.
+- Streaks and drip textures.
+- Dual-zone processing.
+- Loupe inspection.
+- Transfer simulation.
+- Compare wipe.
+- Print queue.
