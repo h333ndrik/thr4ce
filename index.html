@@ -76,6 +76,17 @@
   </div>
 
   <div class="control-group">
+    <h2>Project</h2>
+    <div class="control-actions project-actions">
+      <button id="save-project" type="button" disabled>Save project</button>
+      <label class="button" id="open-project-label">Open project
+        <input id="open-project" type="file" accept=".thr4ce,.json" disabled>
+      </label>
+    </div>
+    <p class="hint">Settings and strokes only. The original image is relinked by SHA-256.</p>
+  </div>
+
+  <div class="control-group">
     <h2>Tone</h2>
     <label for="brightness">Brightness <output id="brightness-value">0</output>
       <input id="brightness" type="range" min="-100" max="100" step="1" value="0" disabled>

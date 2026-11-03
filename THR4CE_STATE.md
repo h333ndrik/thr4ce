@@ -12,16 +12,17 @@
 - Block 8 deploy and PWA: `7757581` (`block 8: add deploy and PWA support`).
 - Block 9 favicon and share polish: `d9637cf` (`block 9: favicon and share polish`).
 - Block 10 workflow and texture presets: `490b86b` (`block 10: workflow and texture presets`).
+- Block 11 seeded randomize: `e6d6267` (`block 11: randomize with seed`).
 - Blocks 0–8 are implemented. The app remains dependency-free and runs without a build step.
 - Source hashes, complete settings, and deterministic stroke evidence are included in the JSON export.
 - Desktop and 390 px layouts were rendered and inspected.
 
 ## Block
-- Block 11 seeded randomize: complete. Randomize uses a 16-character cryptographic seed and reusable field hashes, preserves mirror, strokes, inversion, rotation, and print settings, records `random_seed` in evidence, and is one undo step.
+- Block 12 project files: complete. Save project writes portable `.thr4ce` settings and operations; open project validates tool, version, and SHA-256, restores settings and treatments deterministically, and clears history.
 - Block 8 verification: `node --check` passed for `app.js`, `cursor.js`, and `sw.js`; manifest and installability errors were empty; the service worker activated and controlled the page; 192, 512, and 180 px icons rendered; Add-to-Home-Screen metadata was present; a full offline reload loaded the app from `thr4ce-v1`.
 
 ## In progress
 - None.
 
 ## Next
-- Block 12 project files.
+- Block 13 coverage meter.

@@ -1178,6 +1178,8 @@ function syncControls() {
   $('brush-mode').disabled = $('brush-size').disabled = $('brush-strength').disabled = $('ghost-toggle').disabled = !state.img;
   for (const button of document.querySelectorAll('[data-preset]')) button.disabled = !state.img;
   $('randomize').disabled = !state.img;
+  $('save-project').disabled = $('open-project').disabled = !state.img;
+  $('open-project-label').classList.toggle('is-disabled', !state.img);
   for (const id of ['brightness', 'contrast', 'threshold', 'dotsize', 'intensity', 'brush-size', 'brush-strength']) $(id).value = state[id];
   $('method').value = state.method;
   $('brush-mode').value = state.brushMode;
@@ -1320,6 +1322,12 @@ document.addEventListener('pointerdown', event => {
   if (viewer.contains(event.target) || event.target.closest?.('.preview-options')) return;
   clearSelection();
 });
+$('save-project').onclick = saveProjectFile;
+$('open-project').addEventListener('change', async event => {
+  const file = event.target.files[0];
+  event.target.value = '';
+  await openProjectFile(file);
+});
 $('download-evidence').onclick = () => {
   if (!pendingEvidence) return;
   downloadBlob(pendingEvidence.blob, pendingEvidence.name);
@@ -1360,6 +1368,193 @@ function downloadBlob(blob, filename, delay = 0) {
     link.click();
     setTimeout(() => URL.revokeObjectURL(link.href), 1000);
   }, delay);
+}
+
+const BRUSH_MODES = new Set(['break', 'thin', 'fatten', 'dissolve', 'restore']);
+const DITHER_METHODS = new Set(['none', 'floyd-steinberg', 'jarvis', 'bayer', 'round-dot']);
+
+function projectSettings() {
+  return {
+    brightness: state.brightness,
+    contrast: state.contrast,
+    threshold: state.threshold,
+    method: state.method,
+    dotsize: state.dotsize,
+    intensity: state.intensity,
+    mirrored: state.mirrored,
+    invert: state.invert,
+    despeckle: state.despeckle,
+    random_seed: state.randomSeed,
+    brush: {
+      mode: state.brushMode,
+      radius: state.brushSize,
+      strength: state.brushStrength,
+      ghost: state.ghost
+    },
+    print: {
+      width: state.printWidth,
+      height: state.printHeight,
+      unit: state.printUnit,
+      dpiPreset: state.dpiPreset,
+      customDpi: state.customDpi,
+      rotate90: state.rotate90
+    }
+  };
+}
+
+function finiteNumberOr(value, fallback) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function normalizedRect(value) {
+  if (!value || !['x', 'y', 'width', 'height'].every(key => Number.isFinite(Number(value[key])))) return null;
+  return {x: Number(value.x), y: Number(value.y), width: Number(value.width), height: Number(value.height)};
+}
+
+function normalizeProjectStrokes(value) {
+  if (!Array.isArray(value)) throw new Error('Project strokes must be an array.');
+  return value.map(operation => {
+    if (!operation || typeof operation !== 'object') throw new Error('Invalid project treatment.');
+    if (operation.type === 'isolate' || operation.type === 'erase') {
+      const rect = normalizedRect(operation.rect);
+      if (!rect || rect.width <= 0 || rect.height <= 0) throw new Error('Invalid selection treatment.');
+      if (operation.type === 'erase') return {type: 'erase', rect};
+      if (typeof operation.seed !== 'string' || !/^[0-9a-f]{16}$/i.test(operation.seed)) throw new Error('Invalid treatment seed.');
+      return {type: 'isolate', rect, seed: operation.seed};
+    }
+    if (!BRUSH_MODES.has(operation.mode)) throw new Error('Invalid brush mode.');
+    if (typeof operation.seed !== 'string' || !/^[0-9a-f]{16}$/i.test(operation.seed)) throw new Error('Invalid brush seed.');
+    if (!Array.isArray(operation.segments) || !operation.segments.length) throw new Error('Invalid brush path.');
+    const segments = operation.segments.map(segment => {
+      if (!segment || !Number.isFinite(Number(segment.x)) || !Number.isFinite(Number(segment.y))) throw new Error('Invalid brush point.');
+      return {x: Number(segment.x), y: Number(segment.y)};
+    });
+    return {
+      mode: operation.mode,
+      radius: clamp(Math.round(finiteNumberOr(operation.radius, 12)), 2, 64),
+      strength: clamp(Math.round(finiteNumberOr(operation.strength, 50)), 0, 100),
+      seed: operation.seed,
+      segments
+    };
+  });
+}
+
+function applyProject(project) {
+  const settings = project.settings;
+  const brush = settings.brush || {};
+  const print = settings.print || {};
+  const strokes = normalizeProjectStrokes(project.strokes);
+  const method = DITHER_METHODS.has(settings.method) ? settings.method : 'none';
+  const brushMode = BRUSH_MODES.has(brush.mode) ? brush.mode : 'break';
+  const printUnit = UNIT_MM[print.unit] ? print.unit : 'mm';
+  let dpiPreset = ['203', '300', '600', 'custom'].includes(String(print.dpiPreset)) ? String(print.dpiPreset) : null;
+  let customDpi = clamp(Math.round(finiteNumberOr(print.customDpi, 300)), 36, 2400);
+  if (!dpiPreset) {
+    const savedDpi = Number(print.dpi);
+    if ([203, 300, 600].includes(savedDpi)) dpiPreset = String(savedDpi);
+    else {
+      dpiPreset = 'custom';
+      if (Number.isFinite(savedDpi)) customDpi = clamp(Math.round(savedDpi), 36, 2400);
+    }
+  }
+  Object.assign(state, {
+    brightness: clamp(Math.round(finiteNumberOr(settings.brightness, 0)), -100, 100),
+    contrast: clamp(Math.round(finiteNumberOr(settings.contrast, 0)), -100, 100),
+    threshold: clamp(Math.round(finiteNumberOr(settings.threshold, 0)), 0, 100),
+    method,
+    dotsize: clamp(Math.round(finiteNumberOr(settings.dotsize, 4)), 1, 16),
+    intensity: clamp(Math.round(finiteNumberOr(settings.intensity, 50)), 0, 100),
+    mirrored: Boolean(settings.mirrored),
+    invert: Boolean(settings.invert),
+    despeckle: Boolean(settings.despeckle),
+    randomSeed: typeof settings.random_seed === 'string' && /^[0-9a-f]{16}$/i.test(settings.random_seed) ? settings.random_seed : null,
+    brushMode,
+    brushSize: clamp(Math.round(finiteNumberOr(brush.radius, 12)), 2, 64),
+    brushStrength: clamp(Math.round(finiteNumberOr(brush.strength, 50)), 0, 100),
+    ghost: brush.ghost !== false,
+    printWidth: Math.max(.1, finiteNumberOr(print.width, 100)),
+    printHeight: Math.max(.1, finiteNumberOr(print.height, 75)),
+    printUnit,
+    dpiPreset,
+    customDpi,
+    rotate90: Boolean(print.rotate90),
+    strokes,
+    history: [],
+    future: [],
+    gesture: false,
+    comparing: false,
+    currentStroke: null,
+    strokeBefore: null,
+    strokePointerId: null,
+    selection: null,
+    selectSession: null
+  });
+  invalidateBase();
+  syncControls();
+  render();
+  updateSelectionOverlay();
+  updateHistory();
+  status(`project applied · ${strokes.length} treatments`);
+}
+
+async function openProjectFile(file) {
+  if (!file) return;
+  if (!state.img) {
+    status('Import the matching image before opening a project.');
+    return;
+  }
+  let project;
+  try {
+    project = JSON.parse(await file.text());
+  } catch (error) {
+    status('Could not read this project file. Nothing changed.');
+    return;
+  }
+  if (!project || project.tool !== 'thr4ce') {
+    status('This is not a thr4ce project. Nothing changed.');
+    return;
+  }
+  if (project.version !== 1) {
+    status(`Unsupported project version ${project.version}. This build supports version 1.`);
+    return;
+  }
+  if (!project.source || !project.settings || !Array.isArray(project.strokes)) {
+    status('This thr4ce project is incomplete. Nothing changed.');
+    return;
+  }
+  const projectHash = String(project.source.sha256 || '').toLowerCase();
+  const currentHash = String(state.sourceHash || '').toLowerCase();
+  if (!projectHash || projectHash !== currentHash) {
+    const projectShort = projectHash ? projectHash.slice(0, 8) : 'unknown';
+    const currentShort = currentHash ? currentHash.slice(0, 8) : 'unknown';
+    status(`Image mismatch · project ${projectShort} · current ${currentShort}. Nothing changed.`);
+    return;
+  }
+  try {
+    applyProject(project);
+  } catch (error) {
+    status(`${error.message} Nothing changed.`);
+  }
+}
+
+function saveProjectFile() {
+  if (!state.img) return;
+  const project = {
+    tool: 'thr4ce',
+    version: 1,
+    source: {
+      name: state.name,
+      width: state.img.width,
+      height: state.img.height,
+      sha256: state.sourceHash
+    },
+    settings: projectSettings(),
+    strokes: cloneStrokes(state.strokes)
+  };
+  const filename = state.name.replace(/\.[^.]+$/, '') + '.thr4ce';
+  downloadBlob(new Blob([JSON.stringify(project, null, 2)], {type: 'application/json'}), filename);
+  status(`project saved · ${filename}`);
 }
 
 function buildEvidence() {
