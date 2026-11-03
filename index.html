@@ -57,6 +57,9 @@
     <label for="threshold">Threshold <output id="threshold-value">off</output>
       <input id="threshold" type="range" min="0" max="100" step="1" value="0" disabled>
     </label>
+    <div class="control-actions">
+      <button id="auto-threshold" type="button" disabled title="Choose a threshold from the tonal histogram">Auto threshold</button>
+    </div>
   </div>
 
   <div class="control-group">
@@ -97,6 +100,9 @@
       <input id="brush-strength" type="range" min="0" max="100" step="1" value="50" disabled>
     </label>
     <label class="check-row" for="ghost-toggle"><input id="ghost-toggle" type="checkbox" checked disabled> Ghost overlay</label>
+    <div class="control-actions">
+      <button id="despeckle" type="button" disabled title="Remove ink components smaller than four pixels">Despeckle</button>
+    </div>
   </div>
 
   <div class="control-group">

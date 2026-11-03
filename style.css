@@ -44,7 +44,7 @@ output{float:right;font-variant-numeric:tabular-nums}
 .hint{margin:6px 0 0;font-size:11px;color:#777;line-height:1.6}
 .check-row{display:flex!important;align-items:center;gap:8px;margin-top:12px}
 .check-row input{width:15px;height:15px;accent-color:#555;margin:0}
-.control-actions{justify-content:flex-start}
+.control-actions{justify-content:flex-start;margin-top:10px}
 footer{flex-wrap:wrap;margin-top:20px}
 .limits{font-size:11px;color:#777;line-height:1.6;margin:0}
 .actions{display:flex;gap:8px}

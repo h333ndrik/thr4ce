@@ -11,7 +11,7 @@ const baseCtx = baseCanvas.getContext('2d', {willReadFrequently: true});
 const maskCanvas = document.createElement('canvas');
 const maskCtx = maskCanvas.getContext('2d', {willReadFrequently: true});
 const MIN_ZOOM = .25, MAX_ZOOM = 8;
-const DEFAULTS = {brightness: 0, contrast: 0, threshold: 0, method: 'none', dotsize: 4, intensity: 50, mirrored: false, brushMode: 'break', brushSize: 12, brushStrength: 50, ghost: true, invert: false};
+const DEFAULTS = {brightness: 0, contrast: 0, threshold: 0, method: 'none', dotsize: 4, intensity: 50, mirrored: false, despeckle: false, brushMode: 'break', brushSize: 12, brushStrength: 50, ghost: true, invert: false};
 const state = {...DEFAULTS, img: null, name: '', history: [], future: [], gesture: false, comparing: false, raf: 0, zoom: 1, panX: 0, panY: 0, zoomMode: 'fit', activeTool: 'brush', spaceDown: false, renderMs: 0, renderMode: 'rgb', strokes: [], currentStroke: null, strokeBefore: null, strokePointerId: null};
 let baseMask = null;
 let mask = null;
@@ -35,8 +35,8 @@ function invalidateBase() {
 
 function status(message) { $('status').textContent = message; }
 function snapshot() {
-  const {brightness, contrast, threshold, method, dotsize, intensity, mirrored, invert} = state;
-  return {brightness, contrast, threshold, method, dotsize, intensity, mirrored, invert, strokes: cloneStrokes(state.strokes)};
+  const {brightness, contrast, threshold, method, dotsize, intensity, mirrored, invert, despeckle} = state;
+  return {brightness, contrast, threshold, method, dotsize, intensity, mirrored, invert, despeckle, strokes: cloneStrokes(state.strokes)};
 }
 function cloneSnapshot(value) {
   return {...value, strokes: cloneStrokes(value.strokes || [])};
@@ -169,7 +169,7 @@ function render(original = false, forExport = false) {
   }
 
   ensureStencilData();
-  const stencilMode = state.method !== 'none' || state.threshold > 0 || state.strokes.length > 0 || Boolean(state.currentStroke);
+  const stencilMode = state.method !== 'none' || state.threshold > 0 || state.despeckle || state.strokes.length > 0 || Boolean(state.currentStroke);
   if (stencilMode) paintMaskPreview(forExport);
   else paintTonePreview();
 
@@ -218,6 +218,7 @@ function rebuildAppliedMask() {
   if (!baseMask|| !baseCanvas.width || !baseCanvas.height) return;
   mask = baseMask.slice();
   for (const stroke of state.strokes) applyStrokeToMask(stroke);
+  if (state.despeckle) removeSmallComponents(mask, baseCanvas.width, baseCanvas.height, 4);
   maskDirty = false;
 }
 
@@ -447,6 +448,80 @@ new ResizeObserver(() => {
   if (state.zoomMode === 'fit') fitToView();
   else applyViewTransform();
 }).observe(viewer);
+
+function removeSmallComponents(target, width, height, minSize) {
+  const visited = new Uint8Array(width * height);
+  const queue = new Int32Array(width * height);
+  let removed = 0;
+  for (let start = 0; start < target.length; start++) {
+    if (!target[start] || visited[start]) continue;
+    let head = 0, tail = 0;
+    queue[tail++] = start;
+    visited[start] = 1;
+    while (head < tail) {
+      const index = queue[head++];
+      const x = index % width, y = (index / width) | 0;
+      if (x > 0) {
+        const next = index - 1;
+        if (target[next] && !visited[next]) { visited[next] = 1; queue[tail++] = next; }
+      }
+      if (x + 1 < width) {
+        const next = index + 1;
+        if (target[next] && !visited[next]) { visited[next] = 1; queue[tail++] = next; }
+      }
+      if (y > 0) {
+        const next = index - width;
+        if (target[next] && !visited[next]) { visited[next] = 1; queue[tail++] = next; }
+      }
+      if (y + 1 < height) {
+        const next = index + width;
+        if (target[next] && !visited[next]) { visited[next] = 1; queue[tail++] = next; }
+      }
+    }
+    if (tail < minSize) {
+      for (let i = 0; i < tail; i++) target[queue[i]] = 0;
+      removed += tail;
+    }
+  }
+  return removed;
+}
+
+function otsuThreshold() {
+  const analysis = document.createElement('canvas');
+  analysis.width = state.img.width;
+  analysis.height = state.img.height;
+  const target = analysis.getContext('2d', {willReadFrequently: true});
+  target.filter = `brightness(${1 + state.brightness / 100}) contrast(${1 + state.contrast / 100})`;
+  target.fillStyle = '#fff';
+  target.fillRect(0, 0, analysis.width, analysis.height);
+  target.drawImage(state.img, 0, 0);
+  target.filter = 'none';
+  const pixels = target.getImageData(0, 0, analysis.width, analysis.height).data;
+  const histogram = new Uint32Array(256);
+  let totalSum = 0;
+  const total = analysis.width * analysis.height;
+  for (let i = 0; i < pixels.length; i += 4) {
+    const lum = Math.round(pixels[i] * .299 + pixels[i + 1] * .587 + pixels[i + 2] * .114);
+    histogram[lum]++;
+    totalSum += lum;
+  }
+  let backgroundWeight = 0, backgroundSum = 0, bestVariance = -1, cutoff = 127;
+  for (let level = 0; level < 256; level++) {
+    backgroundWeight += histogram[level];
+    if (!backgroundWeight) continue;
+    const foregroundWeight = total - backgroundWeight;
+    if (!foregroundWeight) break;
+    backgroundSum += level * histogram[level];
+    const backgroundMean = backgroundSum / backgroundWeight;
+    const foregroundMean = (totalSum - backgroundSum) / foregroundWeight;
+    const variance = backgroundWeight * foregroundWeight * (backgroundMean - foregroundMean) ** 2;
+    if (variance > bestVariance) {
+      bestVariance = variance;
+      cutoff = level;
+    }
+  }
+  return cutoff;
+}
 
 function applyThreshold(target, cutoff) {
   const data = target.getImageData(0, 0, target.canvas.width, target.canvas.height);
@@ -720,7 +795,7 @@ function syncControls() {
   $('intensity-value').textContent = String(state.intensity);
   $('brush-size-value').textContent = String(state.brushSize);
   $('brush-strength-value').textContent = String(state.brushStrength);
-  $('mirror').disabled = $('reset').disabled = $('compare').disabled = $('export').disabled = !state.img;
+  $('mirror').disabled = $('reset').disabled = $('compare').disabled = $('export').disabled = $('auto-threshold').disabled = $('despeckle').disabled = !state.img;
   $('brush-tool').disabled = $('hand-tool').disabled = !state.img;
   syncZoomControls();
   updateViewerCursor();
@@ -757,6 +832,32 @@ $('ghost-toggle').addEventListener('change', () => {
   state.ghost = $('ghost-toggle').checked;
   render();
 });
+$('auto-threshold').onclick = () => {
+  if (!state.img || state.currentStroke) return;
+  const cutoff = otsuThreshold();
+  pushHistory();
+  state.method = 'none';
+  state.threshold = clamp(Math.round(cutoff / 2.55), 1, 100);
+  invalidateBase();
+  syncControls();
+  render();
+  status(`Auto threshold set to ${state.threshold}.`);
+};
+$('despeckle').onclick = () => {
+  if (!state.img || state.currentStroke) return;
+  ensureStencilData();
+  const candidate = mask.slice();
+  const removed = removeSmallComponents(candidate, canvas.width, canvas.height, 4);
+  if (!removed) {
+    status('No ink components under 4 px found.');
+    return;
+  }
+  pushHistory();
+  state.despeckle = true;
+  maskDirty = true;
+  render();
+  status(`Despeckled ${removed} isolated ink ${removed === 1 ? 'pixel' : 'pixels'}.`);
+};
 $('reset').onclick = () => {
   pushHistory();
   state.strokes = [];
