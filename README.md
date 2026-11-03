@@ -8,7 +8,7 @@ thr4ce is a standalone, browser-based image editor for preparing tattoo flash ar
 
 **MVP 1 implemented.**
 
-The baseline and implementation Blocks 0–6 are complete. thr4ce is dependency-free and runs directly in the browser with no build step.
+The baseline and implementation Blocks 0–8 are complete. thr4ce is dependency-free and runs directly in the browser with no build step.
 
 ## Features
 
@@ -80,6 +80,18 @@ thr4ce is an independent application.
 ## Run Locally
 
 Open `index.html` directly, or serve the repository directory with any static file server.
+
+## Install (PWA)
+
+GitHub Pages deploys thr4ce at https://h333ndrik.github.io/thr4ce/.
+
+- **iOS / iPadOS:** Open the site in Safari, tap **Share**, then **Add to Home Screen**.
+- **Android:** Open the site in Chrome, then choose **Install app**.
+- **Desktop:** Use the install icon in the browser address bar.
+
+After an update is pushed, reload the app and close/reopen it once. The service worker activates immediately and claims open clients. PWA installation and offline caching require HTTPS or localhost; GitHub Pages provides HTTPS automatically.
+
+Full deployment steps are in [DEPLOY.md](DEPLOY.md).
 
 ## Technology
 

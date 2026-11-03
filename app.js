@@ -1387,3 +1387,13 @@ $('export').onclick = () => {
     status(`exported ${output.width} × ${output.height} @ ${dpi} dpi`);
   }, 'image/png');
 };
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    try {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    } catch (error) {
+      // Registration is unavailable on file:// and in restricted contexts.
+    }
+  });
+}

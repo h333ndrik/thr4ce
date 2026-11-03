@@ -9,12 +9,14 @@
 - Block 4 cleanup tools: `5bc5995` (`block 4: add cleanup tools`).
 - Block 5 print and export: `4ee4b3a` (`block 5: add print export`).
 - Block 6 export evidence: `16c74db` (`block 6: add export evidence`).
-- Blocks 0–6 are implemented. The app remains dependency-free and runs without a build step.
+- Blocks 0–7 are implemented. The app remains dependency-free and runs without a build step.
 - Source hashes, complete settings, and deterministic stroke evidence are included in the JSON export.
 - Desktop and 390 px layouts were rendered and inspected.
 
 ## Block
-- Block 7 selection and isolate: complete. Mouse and touch rectangle selection, live dimensions, Isolate and Erase treatments, Crop, Escape/outside-click/tool-switch dismissal, one-step undo, and isolated export were verified.
+- Block 7 selection and isolate: complete at `cf30126`.
+- Block 8 deploy and PWA: complete. Added the versioned cache-first service worker with offline navigation fallback, install metadata, maskable PNG icons, GitHub Pages instructions, and the install section in the README.
+- Block 8 verification: `node --check` passed for `app.js`, `cursor.js`, and `sw.js`; manifest and installability errors were empty; the service worker activated and controlled the page; 192, 512, and 180 px icons rendered; Add-to-Home-Screen metadata was present; a full offline reload loaded the app from `thr4ce-v1`.
 
 ## In progress
 - None.
