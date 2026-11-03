@@ -8,6 +8,10 @@ const zoomLabel = $('zoom-label');
 const brushRing = $('brush-ring');
 const rollGuide = $('roll-guide');
 const selectionBox = $('selection-box');
+const modeBadge = $('mode-badge');
+const stagePhoto = $('stage-photo');
+const stageStencil = $('stage-stencil');
+const stageRefine = $('stage-refine');
 const baseCanvas = document.createElement('canvas');
 const baseCtx = baseCanvas.getContext('2d', {willReadFrequently: true});
 const maskCanvas = document.createElement('canvas');
@@ -27,7 +31,7 @@ const PRESETS = {
   riso: {label: 'riso', brightness: -4, contrast: 25, method: 'jarvis', dotsize: 2, intensity: 65},
   decay: {label: 'decay', brightness: -8, contrast: 35, method: 'floyd-steinberg', dotsize: 3, intensity: 80}
 };
-const state = {...DEFAULTS, img: null, name: '', history: [], future: [], gesture: false, comparing: false, raf: 0, zoom: 1, panX: 0, panY: 0, zoomMode: 'fit', activeTool: 'brush', spaceDown: false, renderMs: 0, renderMode: 'rgb', inkPercent: 0, strokes: [], currentStroke: null, strokeBefore: null, strokePointerId: null, printWidth: 100, printHeight: 75, printUnit: 'mm', dpiPreset: '203', customDpi: 300, rotate90: false, sourceHash: null, selection: null, selectSession: null};
+const state = {...DEFAULTS, img: null, name: '', history: [], future: [], gesture: false, comparing: false, raf: 0, zoom: 1, panX: 0, panY: 0, zoomMode: 'fit', activeTool: 'brush', spaceDown: false, renderMs: 0, renderMode: 'rgb', inkPercent: 0, strokes: [], currentStroke: null, strokeBefore: null, strokePointerId: null, printWidth: 100, printHeight: 75, printUnit: 'mm', dpiPreset: '203', customDpi: 300, rotate90: false, sourceHash: null, selection: null, selectSession: null, previewPhoto: false};
 let importSequence = 0;
 let pendingEvidence = null;
 let baseMask = null;
@@ -88,6 +92,7 @@ function redo() {
   apply(state.future.pop());
 }
 function apply(s) {
+  state.previewPhoto = false;
   state.currentStroke = null;
   state.strokeBefore = null;
   state.strokePointerId = null;
@@ -157,7 +162,8 @@ async function importImage(file, source = 'input') {
       strokeBefore: null,
       strokePointerId: null,
       selection: null,
-      selectSession: null
+      selectSession: null,
+      previewPhoto: false
     });
     invalidateBase();
     canvas.style.display = 'block';
@@ -206,6 +212,7 @@ function render(original = false, forExport = false) {
   if (!state.img) return;
   const t0 = performance.now();
   const {img} = state;
+  const showOriginal = original || (state.previewPhoto && !forExport);
   if (canvas.width !== img.width || canvas.height !== img.height) {
     canvas.width = img.width;
     canvas.height = img.height;
@@ -216,10 +223,11 @@ function render(original = false, forExport = false) {
   ctx.globalAlpha = 1;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  if (original) {
+  if (showOriginal) {
     ctx.drawImage(img, 0, 0);
     state.renderMs = Math.round(performance.now() - t0);
     state.renderMode = 'source';
+    updateModeBadge(true);
     updateImageInfo();
     return;
   }
@@ -230,8 +238,38 @@ function render(original = false, forExport = false) {
   else paintTonePreview();
 
   state.renderMs = Math.round(performance.now() - t0);
-  state.renderMode = stencilMode ? '1-bit' : 'rgb';
+  const modeStencil = state.method !== 'none' || state.threshold > 0;
+  state.renderMode = modeStencil ? '1-bit' : 'rgb';
+  updateModeBadge(false);
   updateImageInfo();
+}
+
+function updateModeBadge(showOriginal = false) {
+  if (!modeBadge) return;
+  if (!state.img) {
+    modeBadge.hidden = true;
+    return;
+  }
+  const stencilConfigured = state.method !== 'none' || state.threshold > 0;
+  const photo = showOriginal || !stencilConfigured;
+  modeBadge.hidden = false;
+  modeBadge.textContent = photo ? 'PHOTO' : 'STENCIL · 1-BIT';
+  modeBadge.setAttribute('aria-pressed', String(photo));
+  modeBadge.title = photo ? 'Show stencil' : 'Show photo';
+}
+
+function toggleModeBadge() {
+  if (!state.img) return;
+  const stencilConfigured = state.method !== 'none' || state.threshold > 0;
+  if (!stencilConfigured) {
+    state.previewPhoto = true;
+    render();
+    status('Photo view. Choose a threshold or dithering to make a stencil.');
+    return;
+  }
+  state.previewPhoto = !state.previewPhoto;
+  render();
+  status(state.previewPhoto ? 'Photo preview.' : 'Stencil preview.');
 }
 
 function ensureStencilData() {
@@ -470,20 +508,32 @@ function setZoom(nextZoom, clientX, clientY, manual = true) {
   applyViewTransform();
 }
 
+function syncStageFlow() {
+  const hasImage = Boolean(state.img);
+  stagePhoto.classList.toggle('has-image', hasImage);
+  const labelText = $('import-label-text');
+  if (labelText) labelText.textContent = hasImage ? 'Replace image' : '+ Import image';
+  for (const step of [stageStencil, stageRefine]) {
+    step.classList.toggle('is-locked', !hasImage);
+    step.setAttribute('aria-disabled', String(!hasImage));
+  }
+}
+
 function selectTool(tool) {
-  if (state.activeTool === 'select' && tool !== 'select') clearSelection(false);
+  if (tool !== 'brush' && tool !== 'hand') return;
+  if (state.activeTool === 'select') clearSelection(false);
   state.activeTool = tool;
   $('brush-tool').setAttribute('aria-pressed', String(tool === 'brush'));
   $('hand-tool').setAttribute('aria-pressed', String(tool === 'hand'));
-  $('select-tool').setAttribute('aria-pressed', String(tool === 'select'));
+  const selectButton = $('select-tool');
+  if (selectButton) selectButton.setAttribute('aria-pressed', 'false');
   updateViewerCursor();
   updateBrushRing({clientX: -1, clientY: -1});
-  status(tool === 'hand' ? 'Hand tool active. Drag to pan.' : tool === 'select' ? 'Select tool active. Drag a rectangle.' : 'Brush tool active.');
+  status(tool === 'hand' ? 'Hand tool active. Drag to pan.' : 'Brush tool active.');
 }
 
 function updateViewerCursor() {
   viewer.classList.toggle('is-pan-ready', Boolean(state.img) && (state.activeTool === 'hand' || state.spaceDown));
-  viewer.classList.toggle('is-selecting', Boolean(state.img) && state.activeTool === 'select');
 }
 
 function selectionStatus(rect = state.selection) {
@@ -492,10 +542,12 @@ function selectionStatus(rect = state.selection) {
 }
 
 function updateSelectionOverlay() {
+  const actions = $('selection-actions');
+  if (!selectionBox || !actions || !$('isolate') || !$('erase-inside') || !$('crop')) return;
   const rect = state.selection;
   const available = Boolean(state.img && rect && rect.width > 0 && rect.height > 0);
   selectionBox.hidden = !available;
-  $('selection-actions').hidden = !Boolean(state.img && rect);
+  actions.hidden = !Boolean(state.img && rect);
   for (const id of ['isolate', 'erase-inside', 'crop']) $(id).disabled = !available || state.cropping;
   if (!available) return;
   const canvasRect = canvas.getBoundingClientRect();
@@ -645,7 +697,8 @@ async function cropSelection() {
       strokeBefore: null,
       strokePointerId: null,
       selection: null,
-      selectSession: null
+      selectSession: null,
+      previewPhoto: false
     });
     invalidateBase();
     syncControls();
@@ -666,12 +719,25 @@ async function cropSelection() {
 $('zoom-out').onclick = () => setZoom(state.zoom / 1.25);
 $('zoom-in').onclick = () => setZoom(state.zoom * 1.25);
 $('zoom-fit').onclick = () => { fitToView(); status('Artwork fit to view.'); };
+if (modeBadge) {
+  modeBadge.addEventListener('click', toggleModeBadge);
+  modeBadge.addEventListener('keydown', event => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      toggleModeBadge();
+    }
+  });
+}
 $('brush-tool').onclick = () => selectTool('brush');
 $('hand-tool').onclick = () => selectTool('hand');
-$('select-tool').onclick = () => selectTool('select');
-$('isolate').onclick = () => applySelectionTreatment('isolate');
-$('erase-inside').onclick = () => applySelectionTreatment('erase');
-$('crop').onclick = cropSelection;
+const selectButton = $('select-tool');
+if (selectButton) selectButton.onclick = () => selectTool('select');
+const isolateButton = $('isolate');
+if (isolateButton) isolateButton.onclick = () => applySelectionTreatment('isolate');
+const eraseButton = $('erase-inside');
+if (eraseButton) eraseButton.onclick = () => applySelectionTreatment('erase');
+const cropButton = $('crop');
+if (cropButton) cropButton.onclick = cropSelection;
 
 viewer.addEventListener('wheel', event => {
   if (!state.img) return;
@@ -681,7 +747,7 @@ viewer.addEventListener('wheel', event => {
 }, {passive: false});
 
 viewer.addEventListener('dblclick', event => {
-  if (!state.img || event.target.closest('button')) return;
+  if (!state.img || event.target.closest('button, #mode-badge')) return;
   fitToView();
   status('Artwork fit to view.');
 });
@@ -709,7 +775,7 @@ function beginPinch() {
 }
 
 viewer.addEventListener('pointerdown', event => {
-  if (!state.img || event.target.closest('button') || event.button === 2) return;
+  if (!state.img || event.target.closest('button, #mode-badge') || event.button === 2) return;
   event.preventDefault();
   try { viewer.setPointerCapture?.(event.pointerId); } catch {}
   pointers.set(event.pointerId, {x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY});
@@ -1152,6 +1218,7 @@ function randomizedSettings(seed) {
 function randomize(seed = seedHex()) {
   if (!state.img) return;
   pushHistory();
+  state.previewPhoto = false;
   Object.assign(state, randomizedSettings(seed), {randomSeed: seed});
   invalidateBase();
   syncControls();
@@ -1163,6 +1230,7 @@ function applyPreset(id) {
   const preset = PRESETS[id];
   if (!state.img || !preset) return;
   pushHistory();
+  state.previewPhoto = false;
   const {label, threshold, ...settings} = preset;
   Object.assign(state, settings);
   if (threshold === 'otsu') state.threshold = clamp(Math.round(otsuThreshold() / 2.55), 1, 100);
@@ -1196,7 +1264,9 @@ function syncControls() {
   $('brush-strength-value').textContent = String(state.brushStrength);
   $('mirror').disabled = $('reset').disabled = $('compare').disabled = $('export').disabled = $('auto-threshold').disabled = $('despeckle').disabled = !state.img;
   $('mirror').setAttribute('aria-pressed', String(state.mirrored));
-  $('brush-tool').disabled = $('hand-tool').disabled = $('select-tool').disabled = !state.img;
+  $('brush-tool').disabled = $('hand-tool').disabled = !state.img;
+  syncStageFlow();
+  updateModeBadge();
   updateSelectionOverlay();
   syncZoomControls();
   syncPrintControls();
@@ -1207,6 +1277,7 @@ function syncControls() {
 for (const id of ['brightness', 'contrast', 'threshold', 'dotsize', 'intensity']) {
   $(id).addEventListener('input', () => {
     if (!state.gesture) { pushHistory(); state.gesture = true; }
+    if (id === 'threshold') state.previewPhoto = false;
     state[id] = Number($(id).value);
     invalidateBase();
     syncControls(); scheduleRender();
@@ -1215,6 +1286,7 @@ for (const id of ['brightness', 'contrast', 'threshold', 'dotsize', 'intensity']
 }
 $('method').addEventListener('change', () => {
   pushHistory();
+  state.previewPhoto = false;
   state.method = $('method').value;
   invalidateBase();
   syncControls(); scheduleRender();
@@ -1283,6 +1355,7 @@ $('auto-threshold').onclick = () => {
   if (!state.img || state.currentStroke) return;
   const cutoff = otsuThreshold();
   pushHistory();
+  state.previewPhoto = false;
   state.method = 'none';
   state.threshold = clamp(Math.round(cutoff / 2.55), 1, 100);
   invalidateBase();
@@ -1307,6 +1380,7 @@ $('despeckle').onclick = () => {
 };
 $('reset').onclick = () => {
   pushHistory();
+  state.previewPhoto = false;
   state.strokes = [];
   state.selection = null;
   state.selectSession = null;
@@ -1483,6 +1557,7 @@ function applyProject(project) {
     customDpi,
     rotate90: Boolean(print.rotate90),
     strokes,
+    previewPhoto: false,
     history: [],
     future: [],
     gesture: false,
@@ -1653,6 +1728,9 @@ $('export').onclick = () => {
     status(`exported ${output.width} × ${output.height} @ ${dpi} dpi`);
   }, 'image/png');
 };
+
+syncStageFlow();
+updateModeBadge();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

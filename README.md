@@ -8,19 +8,32 @@ thr4ce is a standalone, browser-based image editor for preparing tattoo flash ar
 
 **MVP 1 implemented.**
 
-The baseline and implementation Blocks 0–14 are complete. thr4ce is dependency-free, installable as a PWA, and runs directly in the browser with no build step.
+The baseline and implementation Blocks 0–15 are complete. thr4ce is dependency-free, installable as a PWA, and runs directly in the browser with no build step.
+
+## How it works
+
+Import a photo or flash artwork. Choose a threshold or dithering treatment to make the stencil. Refine it with the brush and export at print size.
 
 ## Features
 
-- Import PNG, JPG, and WebP artwork with a file picker or drag and drop.
+### 1 · Import
+
+- Import PNG, JPG, and WebP artwork through the file picker or drag and drop.
 - Reject unsupported, unreadable, or oversized files without changing the active edit.
+- Replace the working image at any time; originals are never modified.
+
+### 2 · Make stencil
+
+- Toggle the viewer between PHOTO and STENCIL · 1-BIT without changing settings.
 - Adjust brightness, contrast, and the black-and-white threshold.
 - Choose a threshold automatically with Otsu histogram analysis.
 - Apply Clean Stencil, Newsprint, Halftone, Xerox, Riso, and Decay workflow presets.
 - Randomize tonal and dithering settings from a reproducible 16-character seed.
-- Save and reopen portable `.thr4ce` project files with exact settings and operations.
-- Read neutral ink coverage for every rebuilt mask.
 - Convert artwork with Floyd–Steinberg, Jarvis–Judice–Ninke, Bayer, or round-dot halftone dithering.
+- Read neutral ink coverage after every rebuilt mask.
+
+### 3 · Refine & export
+
 - Refine the persistent 1-bit mask with Break, Thin, Fatten, Dissolve, and Restore brush modes.
 - Replay every stroke deterministically from its recorded seed, radius, strength, and path.
 - Remove ink components smaller than four pixels with deterministic despeckling.
@@ -28,8 +41,6 @@ The baseline and implementation Blocks 0–14 are complete. thr4ce is dependency
 - Compare against the untouched source while holding Compare.
 - Mirror artwork for stencil transfer.
 - Zoom from 25–800%, fit to view, and pan with Hand, Space-drag, or touch.
-- Mark rectangular regions with Select using mouse, pen, or touch.
-- Isolate a selection, erase its interior, or crop the displayed artwork to that region.
 - Pinch to zoom and double-click or double-tap to fit.
 - Undo and redo up to 50 edits.
 - Define print width and height in millimetres, centimetres, or inches.
@@ -37,6 +48,7 @@ The baseline and implementation Blocks 0–14 are complete. thr4ce is dependency
 - Position artwork against the 58 mm roll-width guide.
 - Invert to white ink on black and rotate the export by 90°.
 - Export a freshly rendered PNG at the exact physical print size.
+- Save and reopen portable `.thr4ce` project files from the header menu.
 
 ## Presets
 
@@ -72,17 +84,6 @@ The image status includes the current percentage of ink pixels after every mask 
 Set the physical width and height, choose the output resolution, and export. Pixel dimensions are calculated as `millimetres × dpi / 25.4` and rounded to whole pixels. The artwork is scaled proportionally inside the requested print area so its aspect ratio is preserved.
 
 thr4ce works with Phomemo, AirPrint, any printer — one perfect file.
-
-## Selection & Isolate
-
-Choose **Select**, then drag a rectangle over the artwork. The live selection size appears in the status line.
-
-- **Isolate** turns everything outside the rectangle into paper white. It is stored in the replayable operation list as an `isolate` treatment with a deterministic seed.
-- **Erase inside** turns the selected interior into paper white and is stored as an `erase` treatment.
-- **Crop** bakes the visible crop into a new working image, clears strokes and history, and fits the new canvas. The imported file is never modified.
-- Press Escape, click outside the selection, or switch tools to dismiss it.
-
-Isolate and Erase are each one undo step. Export always uses the current mask, so an isolated export contains no artwork outside the selected region.
 
 ## Export Evidence
 
