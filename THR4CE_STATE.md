@@ -13,16 +13,17 @@
 - Block 9 favicon and share polish: `d9637cf` (`block 9: favicon and share polish`).
 - Block 10 workflow and texture presets: `490b86b` (`block 10: workflow and texture presets`).
 - Block 11 seeded randomize: `e6d6267` (`block 11: randomize with seed`).
+- Block 12 project files: `748556b` (`block 12: project files`).
 - Blocks 0–8 are implemented. The app remains dependency-free and runs without a build step.
 - Source hashes, complete settings, and deterministic stroke evidence are included in the JSON export.
 - Desktop and 390 px layouts were rendered and inspected.
 
 ## Block
-- Block 12 project files: complete. Save project writes portable `.thr4ce` settings and operations; open project validates tool, version, and SHA-256, restores settings and treatments deterministically, and clears history.
+- Block 13 coverage meter: complete. Ink coverage is counted after every mask rebuild and shown as a neutral percentage in the image status line.
 - Block 8 verification: `node --check` passed for `app.js`, `cursor.js`, and `sw.js`; manifest and installability errors were empty; the service worker activated and controlled the page; 192, 512, and 180 px icons rendered; Add-to-Home-Screen metadata was present; a full offline reload loaded the app from `thr4ce-v1`.
 
 ## In progress
 - None.
 
 ## Next
-- Block 13 coverage meter.
+- Block 14 final docs and live verification.

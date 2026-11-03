@@ -27,7 +27,7 @@ const PRESETS = {
   riso: {label: 'riso', brightness: -4, contrast: 25, method: 'jarvis', dotsize: 2, intensity: 65},
   decay: {label: 'decay', brightness: -8, contrast: 35, method: 'floyd-steinberg', dotsize: 3, intensity: 80}
 };
-const state = {...DEFAULTS, img: null, name: '', history: [], future: [], gesture: false, comparing: false, raf: 0, zoom: 1, panX: 0, panY: 0, zoomMode: 'fit', activeTool: 'brush', spaceDown: false, renderMs: 0, renderMode: 'rgb', strokes: [], currentStroke: null, strokeBefore: null, strokePointerId: null, printWidth: 100, printHeight: 75, printUnit: 'mm', dpiPreset: '203', customDpi: 300, rotate90: false, sourceHash: null, selection: null, selectSession: null};
+const state = {...DEFAULTS, img: null, name: '', history: [], future: [], gesture: false, comparing: false, raf: 0, zoom: 1, panX: 0, panY: 0, zoomMode: 'fit', activeTool: 'brush', spaceDown: false, renderMs: 0, renderMode: 'rgb', inkPercent: 0, strokes: [], currentStroke: null, strokeBefore: null, strokePointerId: null, printWidth: 100, printHeight: 75, printUnit: 'mm', dpiPreset: '203', customDpi: 300, rotate90: false, sourceHash: null, selection: null, selectSession: null};
 let importSequence = 0;
 let pendingEvidence = null;
 let baseMask = null;
@@ -302,6 +302,9 @@ function rebuildAppliedMask() {
     else applyStrokeToMask(operation);
   }
   if (state.despeckle) removeSmallComponents(mask, baseCanvas.width, baseCanvas.height, 4);
+  let inkPixels = 0;
+  for (let i = 0; i < mask.length; i++) inkPixels += mask[i];
+  state.inkPercent = mask.length ? inkPixels / mask.length * 100 : 0;
   maskDirty = false;
 }
 
@@ -364,7 +367,7 @@ function updateImageInfo() {
     $('image-info').textContent = '—';
     return;
   }
-  $('image-info').textContent = `${state.img.width} × ${state.img.height} · ${state.renderMode} · ${state.renderMs} ms · ${Math.round(state.zoom * 100)}%`;
+  $('image-info').textContent = `${state.img.width} × ${state.img.height} · ${state.renderMode} · ${state.renderMs} ms · ${Math.round(state.zoom * 100)}% · ${Math.round(state.inkPercent)}% ink`;
 }
 
 function printDpi() {
