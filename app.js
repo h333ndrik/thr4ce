@@ -8,10 +8,10 @@ const zoomLabel = $('zoom-label');
 const brushRing = $('brush-ring');
 const rollGuide = $('roll-guide');
 const selectionBox = $('selection-box');
-const loupe = $('loupe');
-const loupeCanvas = $('loupe-canvas');
-const loupeToggle = $('loupe-toggle');
-const loupeCtx = loupeCanvas.getContext('2d', {willReadFrequently: true});
+const miniPreview = $('mini-preview');
+const miniPreviewCanvas = $('mini-preview-canvas');
+const miniPreviewCtx = miniPreviewCanvas.getContext('2d');
+const exportDialog = $('export-dialog');
 const modeBadge = $('mode-badge');
 const stagePhoto = $('stage-photo');
 const stageStencil = $('stage-stencil');
@@ -24,7 +24,7 @@ const ghostCanvas = document.createElement('canvas');
 const ghostCtx = ghostCanvas.getContext('2d', {willReadFrequently: true});
 const mirrorCanvas = document.createElement('canvas');
 const mirrorCtx = mirrorCanvas.getContext('2d', {willReadFrequently: true});
-const MIN_ZOOM = .25, MAX_ZOOM = 8, MAX_ZONES = 8;
+const MIN_ZOOM = .25, MAX_ZOOM = 8, MAX_ZONES = 8, FIT_MIN_ZOOM = .01, ZOOM_STEP = 1.25;
 const UNIT_MM = {mm: 1, cm: 10, inch: 25.4};
 const DEFAULTS = {brightness: 0, contrast: 0, blackPoint: 0, whitePoint: 100, preBlur: 0, threshold: 0, method: 'none', dotsize: 4, intensity: 50, mirrored: false, despeckle: false, brushMode: 'break', brushSize: 12, brushStrength: 50, ghost: true, invert: false, randomSeed: null};
 // Each preset tunes only the existing tonal and dithering controls. Mirror is
@@ -46,9 +46,7 @@ let mask = null;
 let ghostMask = null;
 let baseDirty = true;
 let maskDirty = true;
-let loupeEnabled = false;
-let loupePoint = null;
-let loupeRaf = 0;
+let viewerFullyVisible = true;
 
 function cloneStrokes(strokes) {
   return strokes.map(operation => {
@@ -232,7 +230,7 @@ viewer.addEventListener('drop', event => {
 
 function render(original = false, forExport = false) {
   if (!state.img) {
-    hideLoupe();
+    syncMiniPreviewVisibility();
     return;
   }
   const t0 = performance.now();
@@ -254,7 +252,7 @@ function render(original = false, forExport = false) {
     state.renderMode = 'source';
     updateModeBadge(true);
     updateImageInfo();
-    if (!forExport) scheduleLoupeRender();
+    if (!forExport) updateMiniPreview();
     return;
   }
 
@@ -268,7 +266,31 @@ function render(original = false, forExport = false) {
   state.renderMode = modeStencil ? '1-bit' : 'rgb';
   updateModeBadge(false);
   updateImageInfo();
-  if (!forExport) scheduleLoupeRender();
+  if (!forExport) updateMiniPreview();
+}
+
+function updateMiniPreview() {
+  if (!state.img || !miniPreview || miniPreview.hidden) return;
+  const maxWidth = 360;
+  const scale = Math.min(1, maxWidth / canvas.width);
+  const width = Math.max(1, Math.round(canvas.width * scale));
+  const height = Math.max(1, Math.round(canvas.height * scale));
+  if (miniPreviewCanvas.width !== width || miniPreviewCanvas.height !== height) {
+    miniPreviewCanvas.width = width;
+    miniPreviewCanvas.height = height;
+  }
+  miniPreviewCanvas.style.aspectRatio = `${canvas.width} / ${canvas.height}`;
+  miniPreviewCtx.clearRect(0, 0, width, height);
+  miniPreviewCtx.imageSmoothingEnabled = true;
+  miniPreviewCtx.imageSmoothingQuality = 'medium';
+  miniPreviewCtx.drawImage(canvas, 0, 0, width, height);
+}
+
+function syncMiniPreviewVisibility() {
+  if (!miniPreview) return;
+  const show = Boolean(state.img && !viewerFullyVisible);
+  miniPreview.hidden = !show;
+  if (show) updateMiniPreview();
 }
 
 function updateModeBadge(showOriginal = false) {
@@ -524,6 +546,23 @@ function printPixels() {
   };
 }
 
+function updateExportSummary() {
+  if (!$('export-summary-size')) return;
+  const dpi = printDpi();
+  const pixels = printPixels();
+  const unit = state.printUnit;
+  const resolution = state.dpiPreset === '203'
+    ? '203 dpi · Thermal / Phomemo'
+    : state.dpiPreset === 'custom' ? `${dpi} dpi · custom` : `${dpi} dpi`;
+  $('export-summary-size').textContent = `${state.printWidth} × ${state.printHeight} ${unit}`;
+  $('export-summary-resolution').textContent = resolution;
+  $('export-summary-invert').textContent = state.invert ? 'White ink on black' : 'Black ink on white';
+  $('export-summary-rotation').textContent = state.rotate90 ? '90° clockwise' : 'None';
+  const outputWidth = state.rotate90 ? pixels.height : pixels.width;
+  const outputHeight = state.rotate90 ? pixels.width : pixels.height;
+  $('export-summary-resolution').title = `${outputWidth} × ${outputHeight} px`;
+}
+
 function syncPrintControls() {
   const disabled = !state.img;
   $('print-width').disabled = $('print-height').disabled = $('print-unit').disabled = $('dpi-select').disabled = disabled;
@@ -540,6 +579,7 @@ function syncPrintControls() {
   const widthCm = state.printWidth * UNIT_MM[state.printUnit] / 10;
   const heightCm = state.printHeight * UNIT_MM[state.printUnit] / 10;
   $('print-summary').textContent = `prints at ${widthCm.toFixed(1)} × ${heightCm.toFixed(1)} cm @ ${printDpi()} dpi`;
+  updateExportSummary();
   updateRollGuide();
 }
 
@@ -560,7 +600,8 @@ function updateRollGuide() {
 function fitZoomValue() {
   if (!state.img) return 1;
   const rect = viewer.getBoundingClientRect();
-  return clamp(Math.min((rect.width - 56) / state.img.width, (rect.height - 56) / state.img.height), MIN_ZOOM, MAX_ZOOM);
+  const fit = Math.min((rect.width - 56) / state.img.width, (rect.height - 56) / state.img.height);
+  return clamp(fit, FIT_MIN_ZOOM, MAX_ZOOM);
 }
 
 function applyViewTransform() {
@@ -881,9 +922,17 @@ async function cropSelection() {
   }
 }
 
-$('zoom-out').onclick = () => setZoom(state.zoom / 1.25);
-$('zoom-in').onclick = () => setZoom(state.zoom * 1.25);
-$('zoom-fit').onclick = () => { fitToView(); status('Artwork fit to view.'); };
+function bindZoomControl(id, action) {
+  const button = $(id);
+  button.addEventListener('pointerdown', event => event.stopPropagation());
+  button.addEventListener('click', event => {
+    event.preventDefault();
+    action();
+  });
+}
+bindZoomControl('zoom-out', () => setZoom(state.zoom / ZOOM_STEP));
+bindZoomControl('zoom-in', () => setZoom(state.zoom * ZOOM_STEP));
+bindZoomControl('zoom-fit', () => { fitToView(); status('Artwork fit to view.'); });
 if (modeBadge) {
   modeBadge.addEventListener('click', toggleModeBadge);
   modeBadge.addEventListener('keydown', event => {
@@ -936,7 +985,6 @@ function beginPan(pointerId, x, y) {
 function beginPinch() {
   if (state.currentStroke) finishBrushStroke(false);
   cancelSelectionDrag();
-  hideLoupe();
   panSession = null;
   const [a, b] = [...pointers.values()];
   const midX = (a.x + b.x) / 2, midY = (a.y + b.y) / 2;
@@ -962,8 +1010,6 @@ viewer.addEventListener('pointerdown', event => {
 
 viewer.addEventListener('pointermove', event => {
   updateBrushRing(event);
-  if (pointers.size >= 2 || pinchSession) hideLoupe();
-  else updateLoupe(event);
   updateSelectionDrag(event);
   const point = pointers.get(event.pointerId);
   if (!point) return;
@@ -996,7 +1042,6 @@ function finishPointer(event) {
   if (panSession?.pointerId === event.pointerId) panSession = null;
   if (pointers.size < 2) pinchSession = null;
   if (!pointers.size) viewer.classList.remove('is-panning');
-  if (event.pointerType === 'touch') hideLoupe();
   if (event.pointerType === 'touch' && point) {
     const moved = Math.hypot(point.x - point.startX, point.y - point.startY);
     if (moved < 12) {
@@ -1013,7 +1058,7 @@ function finishPointer(event) {
 }
 viewer.addEventListener('pointerup', finishPointer);
 viewer.addEventListener('pointercancel', finishPointer);
-viewer.addEventListener('pointerleave', () => { brushRing.hidden = true; hideLoupe(); });
+viewer.addEventListener('pointerleave', () => { brushRing.hidden = true; });
 
 window.addEventListener('keydown', event => {
   if (event.code !== 'Space' || event.target.closest?.('input, textarea, select, button')) return;
@@ -1034,6 +1079,20 @@ new ResizeObserver(() => {
   if (state.zoomMode === 'fit') fitToView();
   else applyViewTransform();
 }).observe(viewer);
+
+if ('IntersectionObserver' in window) {
+  new IntersectionObserver(entries => {
+    viewerFullyVisible = entries[0].intersectionRatio >= .999;
+    syncMiniPreviewVisibility();
+  }, {threshold: [0, .25, .5, .75, 1]}).observe(viewer);
+}
+
+if (miniPreview) {
+  miniPreview.addEventListener('click', () => {
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    viewer.scrollIntoView({behavior: reduced ? 'auto' : 'smooth', block: 'center'});
+  });
+}
 
 function removeSmallComponents(target, width, height, minSize) {
   const visited = new Uint8Array(width * height);
@@ -1290,86 +1349,6 @@ function canvasPoint(event) {
   };
 }
 
-function hideLoupe() {
-  if (loupeRaf) cancelAnimationFrame(loupeRaf);
-  loupeRaf = 0;
-  if (loupe) loupe.hidden = true;
-}
-
-function loupeMetrics() {
-  const style = getComputedStyle(loupe);
-  return {
-    size: parseFloat(style.getPropertyValue('--loupe-size')) || 160,
-    zoom: parseFloat(style.getPropertyValue('--loupe-zoom')) || 4,
-    dpr: Math.max(1, window.devicePixelRatio || 1)
-  };
-}
-
-function scheduleLoupeRender() {
-  if (!loupeEnabled || !state.img || !loupePoint || loupe.hidden || loupeRaf) return;
-  loupeRaf = requestAnimationFrame(() => {
-    loupeRaf = 0;
-    drawLoupe();
-  });
-}
-
-function drawLoupe() {
-  if (!loupeEnabled || !state.img || !loupePoint || loupe.hidden || !loupeCtx) return;
-  const {size, zoom, dpr} = loupeMetrics();
-  const backingSize = Math.max(1, Math.round(size * dpr));
-  if (loupeCanvas.width !== backingSize || loupeCanvas.height !== backingSize) {
-    loupeCanvas.width = backingSize;
-    loupeCanvas.height = backingSize;
-  }
-  const requestedSourceSize = size / zoom;
-  const sourceWidth = Math.min(canvas.width, requestedSourceSize);
-  const sourceHeight = Math.min(canvas.height, requestedSourceSize);
-  const sourceX = clamp(loupePoint.x - sourceWidth / 2, 0, Math.max(0, canvas.width - sourceWidth));
-  const sourceY = clamp(loupePoint.y - sourceHeight / 2, 0, Math.max(0, canvas.height - sourceHeight));
-  loupeCtx.setTransform(1, 0, 0, 1, 0, 0);
-  loupeCtx.clearRect(0, 0, backingSize, backingSize);
-  loupeCtx.imageSmoothingEnabled = false;
-  loupeCtx.drawImage(canvas, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, backingSize, backingSize);
-}
-
-function positionLoupe(event) {
-  const viewerRect = viewer.getBoundingClientRect();
-  const {size} = loupeMetrics();
-  const offset = 20;
-  const pointerX = event.clientX - viewerRect.left;
-  const pointerY = event.clientY - viewerRect.top;
-  const topOffset = event.pointerType === 'touch' ? -size - offset : offset;
-  const left = clamp(pointerX + offset, 4, Math.max(4, viewerRect.width - size - 4));
-  const top = clamp(pointerY + topOffset, 4, Math.max(4, viewerRect.height - size - 4));
-  loupe.style.left = `${left}px`;
-  loupe.style.top = `${top}px`;
-}
-
-function updateLoupe(event) {
-  if (!loupeEnabled || !state.img || !viewer.contains(event.target)
-    || pointers.size >= 2 || pinchSession || (event.pointerType === 'touch' && state.activeTool !== 'brush')) {
-    hideLoupe();
-    return;
-  }
-  const point = canvasPoint(event);
-  if (!point) {
-    hideLoupe();
-    return;
-  }
-  loupePoint = point;
-  positionLoupe(event);
-  loupe.hidden = false;
-  scheduleLoupeRender();
-}
-
-function setLoupeEnabled(enabled) {
-  if (enabled && !state.img) return;
-  loupeEnabled = Boolean(enabled);
-  loupeToggle.setAttribute('aria-pressed', String(loupeEnabled));
-  if (!loupeEnabled) hideLoupe();
-  else status('Loupe on · move over the artwork.');
-}
-
 function beginBrushStroke(event) {
   const point = canvasPoint(event);
   if (!point) return false;
@@ -1486,7 +1465,11 @@ function applyPreset(id) {
   invalidateBase();
   syncControls();
   render();
-  status(`preset: ${label}`);
+  if (preset.method === 'none') {
+    status(`preset applied: ${label} · Otsu threshold${preset.despeckle ? ' · despeckle' : ''}`);
+  } else {
+    status(`preset applied: ${label} · ${ZONE_METHOD_LABELS[preset.method]} dithering · dot ${state.dotsize} · intensity ${state.intensity}`);
+  }
 }
 
 for (const [id, key] of [['black-point', 'blackPoint'], ['white-point', 'whitePoint'], ['pre-blur', 'preBlur']]) {
@@ -1547,12 +1530,6 @@ function syncControls() {
   $('mirror').disabled = $('reset').disabled = $('compare').disabled = $('export').disabled = $('auto-threshold').disabled = $('despeckle').disabled = !state.img;
   $('mirror').setAttribute('aria-pressed', String(state.mirrored));
   $('brush-tool').disabled = $('hand-tool').disabled = $('select-tool').disabled = !state.img;
-  $('loupe-toggle').disabled = !state.img;
-  if (!state.img) {
-    loupeEnabled = false;
-    $('loupe-toggle').setAttribute('aria-pressed', 'false');
-    hideLoupe();
-  }
   renderZones();
   syncStageFlow();
   updateModeBadge();
@@ -1561,6 +1538,7 @@ function syncControls() {
   syncPrintControls();
   updateViewerCursor();
   updateHistory();
+  syncMiniPreviewVisibility();
 }
 
 for (const id of ['brightness', 'contrast', 'threshold', 'dotsize', 'intensity']) {
@@ -1702,7 +1680,6 @@ $('download-evidence').onclick = () => {
 };
 $('undo').onclick = undo;
 $('redo').onclick = redo;
-$('loupe-toggle').onclick = () => setLoupeEnabled(!loupeEnabled);
 window.addEventListener('keydown', event => {
   if (event.key === 'Escape' && state.selection) {
     event.preventDefault();
@@ -1716,20 +1693,17 @@ window.addEventListener('keydown', event => {
 $('compare').addEventListener('pointerdown', () => {
   if (!state.img) return;
   state.comparing = true;
-  if (loupeEnabled && loupePoint) loupe.hidden = false;
   render(true);
 }, {passive: true});
 window.addEventListener('pointerup', () => {
   if (!state.comparing) return;
   state.comparing = false;
   render();
-  hideLoupe();
 }, {passive: true});
 window.addEventListener('pointercancel', () => {
   if (!state.comparing) return;
   state.comparing = false;
   render();
-  hideLoupe();
 }, {passive: true});
 function downloadBlob(blob, filename, delay = 0) {
   setTimeout(() => {
@@ -2043,7 +2017,25 @@ function buildExportCanvas() {
   return output;
 }
 
-$('export').onclick = () => {
+function createPendingEvidence() {
+  const baseName = state.name.replace(/\.[^.]+$/, '');
+  const evidenceBlob = new Blob([JSON.stringify(buildEvidence(), null, 2)], {type: 'application/json'});
+  pendingEvidence = {blob: evidenceBlob, name: `${baseName}.stencil.json`};
+  $('download-evidence').hidden = false;
+  $('download-evidence').disabled = false;
+  return pendingEvidence;
+}
+
+function openExportDialog() {
+  if (!state.img) return;
+  if (state.currentStroke) finishBrushStroke(true);
+  updateExportSummary();
+  if (typeof exportDialog.showModal === 'function') exportDialog.showModal();
+  else exportDialog.setAttribute('open', '');
+  status('Review the export settings, then choose a download.');
+}
+
+function downloadExportPng() {
   if (!state.img) return;
   if (state.currentStroke) finishBrushStroke(true);
   render(false, true);
@@ -2051,24 +2043,35 @@ $('export').onclick = () => {
   const dpi = Number(output.dataset.dpi);
   render();
   const baseName = state.name.replace(/\.[^.]+$/, '');
-  const evidence = buildEvidence();
   output.toBlob(blob => {
     if (!blob) {
       status('Export failed.');
       return;
     }
     downloadBlob(blob, `${baseName}-stencil.png`);
-    const evidenceBlob = new Blob([JSON.stringify(evidence, null, 2)], {type: 'application/json'});
-    pendingEvidence = {blob: evidenceBlob, name: `${baseName}.stencil.json`};
-    $('download-evidence').hidden = false;
-    $('download-evidence').disabled = false;
-    downloadBlob(evidenceBlob, pendingEvidence.name, 1200);
+    createPendingEvidence();
+    if (exportDialog.open) exportDialog.close();
     status(`exported ${output.width} × ${output.height} @ ${dpi} dpi`);
   }, 'image/png');
-};
+}
 
-syncStageFlow();
-updateModeBadge();
+function downloadStencilJson() {
+  if (!state.img) return;
+  const evidence = createPendingEvidence();
+  downloadBlob(evidence.blob, evidence.name);
+  if (exportDialog.open) exportDialog.close();
+  status(`Preparing ${evidence.name}.`);
+}
+
+$('export').onclick = openExportDialog;
+$('download-png').onclick = downloadExportPng;
+$('download-stencil').onclick = downloadStencilJson;
+$('export-dialog-close').onclick = () => exportDialog.close();
+exportDialog.addEventListener('click', event => {
+  if (event.target === exportDialog) exportDialog.close();
+});
+
+syncControls();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

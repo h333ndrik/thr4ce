@@ -8,7 +8,7 @@ thr4ce is a standalone, browser-based image editor for preparing tattoo flash ar
 
 **MVP 1 implemented.**
 
-The baseline and implementation Blocks 0–15, 17, and 18 are complete. thr4ce is dependency-free, installable as a PWA, and runs directly in the browser with no build step.
+The baseline and implementation Blocks 0–18 are complete, followed by a device-feedback UX pass. thr4ce is dependency-free, installable as a PWA, and runs directly in the browser with no build step.
 
 ## How it works
 
@@ -21,6 +21,7 @@ Import a photo or flash artwork. Choose a threshold or dithering treatment to ma
 - Import PNG, JPG, and WebP artwork through the file picker or drag and drop.
 - Reject unsupported, unreadable, or oversized files without changing the active edit.
 - Replace the working image at any time; originals are never modified.
+- Show the complete image at fit-to-view with a margin on import, even when the fitted scale is below the normal 25% zoom floor.
 
 ### 2 · Make stencil
 
@@ -43,15 +44,15 @@ Import a photo or flash artwork. Choose a threshold or dithering treatment to ma
 - Preview the original beneath the mask with the Ghost overlay.
 - Compare against the untouched source while holding Compare.
 - Mirror artwork for stencil transfer.
-- Zoom from 25–800%, fit to view, and pan with Hand, Space-drag, or touch.
-- Inspect mask edges and individual pixels with a 4× loupe that samples the current visible canvas without affecting zoom or export.
+- Zoom from 25–800% after import, fit to view, and pan with Hand, Space-drag, or touch.
 - Pinch to zoom and double-click or double-tap to fit.
+- Keep a clickable mini-preview visible while the main viewer is scrolled away.
 - Undo and redo up to 50 edits.
 - Define print width and height in millimetres, centimetres, or inches.
 - Print at 203 dpi for thermal output, 300 dpi, 600 dpi, or a custom resolution.
 - Position artwork against the 58 mm roll-width guide.
 - Invert to white ink on black and rotate the export by 90°.
-- Export a freshly rendered PNG at the exact physical print size.
+- Review size, resolution, inversion, and rotation in the export dialog; download the freshly rendered PNG or its `.stencil.json` evidence from there.
 - Save and reopen portable `.thr4ce` project files from the header menu.
 
 ## Levels & Pre-Blur
@@ -105,9 +106,9 @@ thr4ce works with Phomemo, AirPrint, any printer — one perfect file.
 
 ## Export Evidence
 
-Each export prepares a `<name>.stencil.json` sidecar next to the PNG. It records the source dimensions and SHA-256 hash, all tone, dithering, brush, inversion, despeckle, rotation, and print settings, every stroke seed and segment, and the zone list.
+The export dialog can write a `<name>.stencil.json` evidence file alongside the PNG. It records the source dimensions and SHA-256 hash, all tone, dithering, brush, inversion, despeckle, rotation, and print settings, every stroke seed and segment, and the zone list.
 
-Some browsers block a second automatic download. When that happens, the **Download .stencil.json** control remains available after export and writes the same evidence file.
+The **Download .stencil.json** control remains available below the export button after either download and writes the same evidence file again.
 
 ## Philosophy
 
@@ -155,7 +156,10 @@ Plain HTML, CSS, and JavaScript with the Canvas API and Web Crypto. No framework
 
 - Streaks and drip textures.
 - Dual-zone processing.
-- Loupe inspection.
 - Transfer simulation.
 - Compare wipe.
 - Print queue.
+- Lasso selection controlled by the cursor (Photoshop-style).
+- Multiple layers and multiple images in the player.
+
+Lasso selection and multi-layer/multi-image editing require an architecture phase and are deferred until the current single-image workflow is fully settled.

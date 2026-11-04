@@ -54,16 +54,19 @@
     <div id="roll-guide" aria-hidden="true" hidden><span>58 mm</span></div>
   </div>
   <div id="selection-box" aria-hidden="true" hidden></div>
-  <div id="loupe" aria-hidden="true" hidden><canvas id="loupe-canvas"></canvas></div>
   <div id="brush-ring" aria-hidden="true" hidden></div>
   <div id="empty">Start with an image.<small>Import a flash to prepare it for stenciling.</small></div>
   <div class="zoom-tools" aria-label="Zoom controls">
-    <button id="zoom-out" type="button" aria-label="Zoom out" title="Zoom out">−</button>
+    <button id="zoom-out" type="button" aria-label="Zoom out" title="Zoom out" disabled>−</button>
     <span id="zoom-label">Fit</span>
-    <button id="zoom-in" type="button" aria-label="Zoom in" title="Zoom in">+</button>
-    <button id="zoom-fit" type="button" title="Fit artwork to view">Fit</button>
+    <button id="zoom-in" type="button" aria-label="Zoom in" title="Zoom in" disabled>+</button>
+    <button id="zoom-fit" type="button" title="Fit artwork to view" disabled>Fit</button>
   </div>
 </section>
+
+<button id="mini-preview" class="mini-preview" type="button" aria-label="Return to the artwork preview" title="Back to artwork preview" hidden>
+  <canvas id="mini-preview-canvas" aria-hidden="true"></canvas>
+</button>
 
 <div class="preview-meta">
   <span id="preview-label">No image loaded</span>
@@ -78,7 +81,6 @@
     </div>
     <button id="undo" type="button" aria-label="Undo" title="Undo (Command/Ctrl Z)" disabled>↶</button>
     <button id="redo" type="button" aria-label="Redo" title="Redo (Command/Ctrl Shift Z)" disabled>↷</button>
-    <button id="loupe-toggle" type="button" aria-pressed="false" title="Show a 4× pixel loupe" disabled>Loupe</button>
     <button id="compare" type="button" title="Hold to see the original" disabled>Compare</button>
     <span id="image-info" hidden></span>
   </div>
@@ -91,12 +93,12 @@
       <div class="control-group">
         <h3>Presets</h3>
         <div class="preset-actions" role="group" aria-label="Workflow and texture presets">
-          <button id="preset-clean-stencil" type="button" data-preset="clean" disabled>Clean Stencil</button>
-          <button id="preset-newsprint" type="button" data-preset="newsprint" disabled>Newsprint</button>
-          <button id="preset-halftone" type="button" data-preset="halftone" disabled>Halftone</button>
-          <button id="preset-xerox" type="button" data-preset="xerox" disabled>Xerox</button>
-          <button id="preset-riso" type="button" data-preset="riso" disabled>Riso</button>
-          <button id="preset-decay" type="button" data-preset="decay" disabled>Decay</button>
+          <button id="preset-clean-stencil" type="button" data-preset="clean" title="Clean threshold with Otsu tone selection and despeckle" disabled>Clean Stencil</button>
+          <button id="preset-newsprint" type="button" data-preset="newsprint" title="Round-dot halftone with dot size 5 and 55% ink intensity" disabled>Newsprint</button>
+          <button id="preset-halftone" type="button" data-preset="halftone" title="Large round-dot halftone with dot size 8 and 50% ink intensity" disabled>Halftone</button>
+          <button id="preset-xerox" type="button" data-preset="xerox" title="High-contrast Bayer dithering with dot size 3 and 70% ink intensity" disabled>Xerox</button>
+          <button id="preset-riso" type="button" data-preset="riso" title="Jarvis dithering with dot size 2 and 65% ink intensity" disabled>Riso</button>
+          <button id="preset-decay" type="button" data-preset="decay" title="Floyd–Steinberg dithering with dot size 3 and 80% ink intensity" disabled>Decay</button>
           <button id="randomize" type="button" disabled><span aria-hidden="true">↻</span> Randomize</button>
         </div>
       </div>
@@ -180,9 +182,9 @@
         <label for="brush-strength">Strength <output id="brush-strength-value">50</output>
           <input id="brush-strength" type="range" min="0" max="100" step="1" value="50" disabled>
         </label>
-        <label class="check-row" for="ghost-toggle"><input id="ghost-toggle" type="checkbox" checked disabled> Ghost overlay</label>
+        <label class="check-row" for="ghost-toggle" title="Shows the original photo faintly under the stencil so you can see where the source lines are."><input id="ghost-toggle" type="checkbox" checked disabled> Ghost overlay</label>
         <div class="control-actions">
-          <button id="despeckle" type="button" disabled title="Remove ink components smaller than four pixels">Despeckle</button>
+          <button id="despeckle" type="button" disabled title="Removes isolated ink specks smaller than 4 px (scan-noise cleanup).">Despeckle</button>
         </div>
       </div>
 
@@ -191,6 +193,7 @@
         <div class="control-actions">
           <button id="mirror" type="button" aria-pressed="false" disabled title="Flip horizontally for stencil transfer">Mirror</button>
           <button id="reset" type="button" disabled>Reset</button>
+          <button id="rotate-90" type="button" aria-pressed="false" disabled>Rotate export 90°</button>
         </div>
       </div>
 
@@ -223,7 +226,6 @@
           <p class="print-summary" id="print-summary">prints at 10.0 × 7.5 cm @ 203 dpi</p>
           <div class="print-actions">
             <label class="check-row" for="invert-toggle"><input id="invert-toggle" type="checkbox" disabled> Invert · white on black</label>
-            <button id="rotate-90" type="button" aria-pressed="false" disabled>Rotate export 90°</button>
           </div>
         </div>
       </div>
@@ -232,7 +234,7 @@
         <p class="limits">Non-destructive editing · originals stay untouched.</p>
         <div class="actions">
           <button id="download-evidence" type="button" hidden title="Download the stencil settings and stroke evidence">Download .stencil.json</button>
-          <button id="export" class="primary" disabled>Export PNG ↗</button>
+          <button id="export" class="primary" type="button" disabled title="Review export settings and download">Export…</button>
         </div>
       </div>
     </div>
@@ -241,5 +243,27 @@
 
 <div id="status" role="status" aria-live="polite">Ready to import.</div>
 </main>
+
+<dialog id="export-dialog" class="export-dialog" aria-labelledby="export-dialog-title">
+  <div class="export-dialog-card">
+    <div class="export-dialog-head">
+      <div>
+        <p class="eyebrow">Final output</p>
+        <h2 id="export-dialog-title">Export stencil</h2>
+      </div>
+      <button id="export-dialog-close" class="dialog-close" type="button" aria-label="Close export dialog" title="Close">×</button>
+    </div>
+    <dl class="export-summary">
+      <div><dt>Size</dt><dd id="export-summary-size">—</dd></div>
+      <div><dt>Resolution</dt><dd id="export-summary-resolution">—</dd></div>
+      <div><dt>Invert</dt><dd id="export-summary-invert">—</dd></div>
+      <div><dt>Rotation</dt><dd id="export-summary-rotation">—</dd></div>
+    </dl>
+    <div class="export-dialog-actions">
+      <button id="download-png" class="primary" type="button">Download PNG</button>
+      <button id="download-stencil" type="button">Download .stencil.json</button>
+    </div>
+  </div>
+</dialog>
 </body>
 </html>
