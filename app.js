@@ -496,12 +496,15 @@ function paintMaskPreview(forExport = false) {
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
 function updateImageInfo() {
+  const info = $('image-info');
   if (!state.img) {
-    $('image-info').textContent = '—';
+    info.textContent = '';
+    info.hidden = true;
     return;
   }
+  info.hidden = false;
   const zoneCount = state.zones.length ? ` · ${state.zones.length} ${state.zones.length === 1 ? 'zone' : 'zones'}` : '';
-  $('image-info').textContent = `${state.img.width} × ${state.img.height} · ${state.renderMode} · ${state.renderMs} ms · ${Math.round(state.zoom * 100)}% · ${Math.round(state.inkPercent)}% ink${zoneCount}`;
+  info.textContent = `${state.img.width} × ${state.img.height} · ${state.renderMode} · ${state.renderMs} ms · ${Math.round(state.zoom * 100)}% · ${Math.round(state.inkPercent)}% ink${zoneCount}`;
 }
 
 function printDpi() {
