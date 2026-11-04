@@ -25,12 +25,13 @@
 - Block 15 staged flow UX: complete. Import, Make stencil, and Refine & export are grouped into three steps with a clickable PHOTO/STENCIL badge and a header project menu. Selection features remain in code but are hidden from the UI for future use.
 - Block 17 Levels and pre-blur: complete. Black/white point remapping and 0–6 px pre-blur run before threshold/dithering; Otsu uses the same adjusted base. Slider gestures are one undo step, reset is neutral, and Levels settings persist in projects and evidence.
 - Block 18 zone treatments: complete. Rectangle selection returns with the Select tool and a single Add zone action. Up to eight zones snapshot their method, threshold, dot size, and intensity; zone quantization is isolated to its rectangle, participates in undo/redo, projects, and evidence, and reset clears all zones.
+- Mini-block loupe: complete. A toggleable 4× loupe samples a 40×40 px area from the currently visible canvas, stays crisp with nearest-neighbor scaling, follows mouse and touch pointers, updates after brush strokes, shows the original while Compare is held, and leaves export/history untouched.
 - Blocks 0–15, 17, and 18 are complete. Block 16 (loupe) was optional and is not present in this checkout.
 - Block 8 verification: `node --check` passed for `app.js`, `cursor.js`, and `sw.js`; manifest and installability errors were empty; the service worker activated and controlled the page; 192, 512, and 180 px icons rendered; Add-to-Home-Screen metadata was present; a full offline reload loaded the app from `thr4ce-v1`.
 
 ## In progress
-- None.
+- UX polish and favicon fallback.
 
 ## Next
-- User feedback.
+- Complete the remaining mini-block tasks, then user feedback.
 - Enable GitHub Pages using `DEPLOY.md`, then rerun the live PWA check.

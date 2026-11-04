@@ -51,6 +51,7 @@
     <div id="roll-guide" aria-hidden="true" hidden><span>58 mm</span></div>
   </div>
   <div id="selection-box" aria-hidden="true" hidden></div>
+  <div id="loupe" aria-hidden="true" hidden><canvas id="loupe-canvas"></canvas></div>
   <div id="brush-ring" aria-hidden="true" hidden></div>
   <div id="empty">Start with an image.<small>Import a flash to prepare it for stenciling.</small></div>
   <div class="zoom-tools" aria-label="Zoom controls">
@@ -74,6 +75,7 @@
     </div>
     <button id="undo" type="button" aria-label="Undo" title="Undo (Command/Ctrl Z)" disabled>↶</button>
     <button id="redo" type="button" aria-label="Redo" title="Redo (Command/Ctrl Shift Z)" disabled>↷</button>
+    <button id="loupe-toggle" type="button" aria-pressed="false" title="Show a 4× pixel loupe" disabled>Loupe</button>
     <button id="compare" type="button" title="Hold to see the original" disabled>Compare</button>
     <span id="image-info">—</span>
   </div>

@@ -44,6 +44,7 @@ Import a photo or flash artwork. Choose a threshold or dithering treatment to ma
 - Compare against the untouched source while holding Compare.
 - Mirror artwork for stencil transfer.
 - Zoom from 25–800%, fit to view, and pan with Hand, Space-drag, or touch.
+- Inspect mask edges and individual pixels with a 4× loupe that samples the current visible canvas without affecting zoom or export.
 - Pinch to zoom and double-click or double-tap to fit.
 - Undo and redo up to 50 edits.
 - Define print width and height in millimetres, centimetres, or inches.

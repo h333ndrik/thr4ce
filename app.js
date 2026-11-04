@@ -8,6 +8,10 @@ const zoomLabel = $('zoom-label');
 const brushRing = $('brush-ring');
 const rollGuide = $('roll-guide');
 const selectionBox = $('selection-box');
+const loupe = $('loupe');
+const loupeCanvas = $('loupe-canvas');
+const loupeToggle = $('loupe-toggle');
+const loupeCtx = loupeCanvas.getContext('2d', {willReadFrequently: true});
 const modeBadge = $('mode-badge');
 const stagePhoto = $('stage-photo');
 const stageStencil = $('stage-stencil');
@@ -42,6 +46,9 @@ let mask = null;
 let ghostMask = null;
 let baseDirty = true;
 let maskDirty = true;
+let loupeEnabled = false;
+let loupePoint = null;
+let loupeRaf = 0;
 
 function cloneStrokes(strokes) {
   return strokes.map(operation => {
@@ -224,7 +231,10 @@ viewer.addEventListener('drop', event => {
 });
 
 function render(original = false, forExport = false) {
-  if (!state.img) return;
+  if (!state.img) {
+    hideLoupe();
+    return;
+  }
   const t0 = performance.now();
   const {img} = state;
   const showOriginal = original || (state.previewPhoto && !forExport);
@@ -244,6 +254,7 @@ function render(original = false, forExport = false) {
     state.renderMode = 'source';
     updateModeBadge(true);
     updateImageInfo();
+    if (!forExport) scheduleLoupeRender();
     return;
   }
 
@@ -257,6 +268,7 @@ function render(original = false, forExport = false) {
   state.renderMode = modeStencil ? '1-bit' : 'rgb';
   updateModeBadge(false);
   updateImageInfo();
+  if (!forExport) scheduleLoupeRender();
 }
 
 function updateModeBadge(showOriginal = false) {
@@ -921,6 +933,7 @@ function beginPan(pointerId, x, y) {
 function beginPinch() {
   if (state.currentStroke) finishBrushStroke(false);
   cancelSelectionDrag();
+  hideLoupe();
   panSession = null;
   const [a, b] = [...pointers.values()];
   const midX = (a.x + b.x) / 2, midY = (a.y + b.y) / 2;
@@ -946,6 +959,8 @@ viewer.addEventListener('pointerdown', event => {
 
 viewer.addEventListener('pointermove', event => {
   updateBrushRing(event);
+  if (pointers.size >= 2 || pinchSession) hideLoupe();
+  else updateLoupe(event);
   updateSelectionDrag(event);
   const point = pointers.get(event.pointerId);
   if (!point) return;
@@ -978,6 +993,7 @@ function finishPointer(event) {
   if (panSession?.pointerId === event.pointerId) panSession = null;
   if (pointers.size < 2) pinchSession = null;
   if (!pointers.size) viewer.classList.remove('is-panning');
+  if (event.pointerType === 'touch') hideLoupe();
   if (event.pointerType === 'touch' && point) {
     const moved = Math.hypot(point.x - point.startX, point.y - point.startY);
     if (moved < 12) {
@@ -994,7 +1010,7 @@ function finishPointer(event) {
 }
 viewer.addEventListener('pointerup', finishPointer);
 viewer.addEventListener('pointercancel', finishPointer);
-viewer.addEventListener('pointerleave', () => { brushRing.hidden = true; });
+viewer.addEventListener('pointerleave', () => { brushRing.hidden = true; hideLoupe(); });
 
 window.addEventListener('keydown', event => {
   if (event.code !== 'Space' || event.target.closest?.('input, textarea, select, button')) return;
@@ -1271,6 +1287,86 @@ function canvasPoint(event) {
   };
 }
 
+function hideLoupe() {
+  if (loupeRaf) cancelAnimationFrame(loupeRaf);
+  loupeRaf = 0;
+  if (loupe) loupe.hidden = true;
+}
+
+function loupeMetrics() {
+  const style = getComputedStyle(loupe);
+  return {
+    size: parseFloat(style.getPropertyValue('--loupe-size')) || 160,
+    zoom: parseFloat(style.getPropertyValue('--loupe-zoom')) || 4,
+    dpr: Math.max(1, window.devicePixelRatio || 1)
+  };
+}
+
+function scheduleLoupeRender() {
+  if (!loupeEnabled || !state.img || !loupePoint || loupe.hidden || loupeRaf) return;
+  loupeRaf = requestAnimationFrame(() => {
+    loupeRaf = 0;
+    drawLoupe();
+  });
+}
+
+function drawLoupe() {
+  if (!loupeEnabled || !state.img || !loupePoint || loupe.hidden || !loupeCtx) return;
+  const {size, zoom, dpr} = loupeMetrics();
+  const backingSize = Math.max(1, Math.round(size * dpr));
+  if (loupeCanvas.width !== backingSize || loupeCanvas.height !== backingSize) {
+    loupeCanvas.width = backingSize;
+    loupeCanvas.height = backingSize;
+  }
+  const requestedSourceSize = size / zoom;
+  const sourceWidth = Math.min(canvas.width, requestedSourceSize);
+  const sourceHeight = Math.min(canvas.height, requestedSourceSize);
+  const sourceX = clamp(loupePoint.x - sourceWidth / 2, 0, Math.max(0, canvas.width - sourceWidth));
+  const sourceY = clamp(loupePoint.y - sourceHeight / 2, 0, Math.max(0, canvas.height - sourceHeight));
+  loupeCtx.setTransform(1, 0, 0, 1, 0, 0);
+  loupeCtx.clearRect(0, 0, backingSize, backingSize);
+  loupeCtx.imageSmoothingEnabled = false;
+  loupeCtx.drawImage(canvas, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, backingSize, backingSize);
+}
+
+function positionLoupe(event) {
+  const viewerRect = viewer.getBoundingClientRect();
+  const {size} = loupeMetrics();
+  const offset = 20;
+  const pointerX = event.clientX - viewerRect.left;
+  const pointerY = event.clientY - viewerRect.top;
+  const topOffset = event.pointerType === 'touch' ? -size - offset : offset;
+  const left = clamp(pointerX + offset, 4, Math.max(4, viewerRect.width - size - 4));
+  const top = clamp(pointerY + topOffset, 4, Math.max(4, viewerRect.height - size - 4));
+  loupe.style.left = `${left}px`;
+  loupe.style.top = `${top}px`;
+}
+
+function updateLoupe(event) {
+  if (!loupeEnabled || !state.img || !viewer.contains(event.target)
+    || pointers.size >= 2 || pinchSession || (event.pointerType === 'touch' && state.activeTool !== 'brush')) {
+    hideLoupe();
+    return;
+  }
+  const point = canvasPoint(event);
+  if (!point) {
+    hideLoupe();
+    return;
+  }
+  loupePoint = point;
+  positionLoupe(event);
+  loupe.hidden = false;
+  scheduleLoupeRender();
+}
+
+function setLoupeEnabled(enabled) {
+  if (enabled && !state.img) return;
+  loupeEnabled = Boolean(enabled);
+  loupeToggle.setAttribute('aria-pressed', String(loupeEnabled));
+  if (!loupeEnabled) hideLoupe();
+  else status('Loupe on · move over the artwork.');
+}
+
 function beginBrushStroke(event) {
   const point = canvasPoint(event);
   if (!point) return false;
@@ -1448,6 +1544,12 @@ function syncControls() {
   $('mirror').disabled = $('reset').disabled = $('compare').disabled = $('export').disabled = $('auto-threshold').disabled = $('despeckle').disabled = !state.img;
   $('mirror').setAttribute('aria-pressed', String(state.mirrored));
   $('brush-tool').disabled = $('hand-tool').disabled = $('select-tool').disabled = !state.img;
+  $('loupe-toggle').disabled = !state.img;
+  if (!state.img) {
+    loupeEnabled = false;
+    $('loupe-toggle').setAttribute('aria-pressed', 'false');
+    hideLoupe();
+  }
   renderZones();
   syncStageFlow();
   updateModeBadge();
@@ -1597,6 +1699,7 @@ $('download-evidence').onclick = () => {
 };
 $('undo').onclick = undo;
 $('redo').onclick = redo;
+$('loupe-toggle').onclick = () => setLoupeEnabled(!loupeEnabled);
 window.addEventListener('keydown', event => {
   if (event.key === 'Escape' && state.selection) {
     event.preventDefault();
@@ -1610,17 +1713,20 @@ window.addEventListener('keydown', event => {
 $('compare').addEventListener('pointerdown', () => {
   if (!state.img) return;
   state.comparing = true;
+  if (loupeEnabled && loupePoint) loupe.hidden = false;
   render(true);
 }, {passive: true});
 window.addEventListener('pointerup', () => {
   if (!state.comparing) return;
   state.comparing = false;
   render();
+  hideLoupe();
 }, {passive: true});
 window.addEventListener('pointercancel', () => {
   if (!state.comparing) return;
   state.comparing = false;
   render();
+  hideLoupe();
 }, {passive: true});
 function downloadBlob(blob, filename, delay = 0) {
   setTimeout(() => {
