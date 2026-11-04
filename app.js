@@ -8,9 +8,6 @@ const zoomLabel = $('zoom-label');
 const brushRing = $('brush-ring');
 const rollGuide = $('roll-guide');
 const selectionBox = $('selection-box');
-const miniPreview = $('mini-preview');
-const miniPreviewCanvas = $('mini-preview-canvas');
-const miniPreviewCtx = miniPreviewCanvas.getContext('2d');
 const exportDialog = $('export-dialog');
 const modeBadge = $('mode-badge');
 const stagePhoto = $('stage-photo');
@@ -46,7 +43,6 @@ let mask = null;
 let ghostMask = null;
 let baseDirty = true;
 let maskDirty = true;
-let viewerFullyVisible = true;
 
 function cloneStrokes(strokes) {
   return strokes.map(operation => {
@@ -229,10 +225,7 @@ viewer.addEventListener('drop', event => {
 });
 
 function render(original = false, forExport = false) {
-  if (!state.img) {
-    syncMiniPreviewVisibility();
-    return;
-  }
+  if (!state.img) return;
   const t0 = performance.now();
   const {img} = state;
   const showOriginal = original || (state.previewPhoto && !forExport);
@@ -252,7 +245,6 @@ function render(original = false, forExport = false) {
     state.renderMode = 'source';
     updateModeBadge(true);
     updateImageInfo();
-    if (!forExport) updateMiniPreview();
     return;
   }
 
@@ -266,31 +258,6 @@ function render(original = false, forExport = false) {
   state.renderMode = modeStencil ? '1-bit' : 'rgb';
   updateModeBadge(false);
   updateImageInfo();
-  if (!forExport) updateMiniPreview();
-}
-
-function updateMiniPreview() {
-  if (!state.img || !miniPreview || miniPreview.hidden) return;
-  const maxWidth = 360;
-  const scale = Math.min(1, maxWidth / canvas.width);
-  const width = Math.max(1, Math.round(canvas.width * scale));
-  const height = Math.max(1, Math.round(canvas.height * scale));
-  if (miniPreviewCanvas.width !== width || miniPreviewCanvas.height !== height) {
-    miniPreviewCanvas.width = width;
-    miniPreviewCanvas.height = height;
-  }
-  miniPreviewCanvas.style.aspectRatio = `${canvas.width} / ${canvas.height}`;
-  miniPreviewCtx.clearRect(0, 0, width, height);
-  miniPreviewCtx.imageSmoothingEnabled = true;
-  miniPreviewCtx.imageSmoothingQuality = 'medium';
-  miniPreviewCtx.drawImage(canvas, 0, 0, width, height);
-}
-
-function syncMiniPreviewVisibility() {
-  if (!miniPreview) return;
-  const show = Boolean(state.img && !viewerFullyVisible);
-  miniPreview.hidden = !show;
-  if (show) updateMiniPreview();
 }
 
 function updateModeBadge(showOriginal = false) {
@@ -1080,20 +1047,6 @@ new ResizeObserver(() => {
   else applyViewTransform();
 }).observe(viewer);
 
-if ('IntersectionObserver' in window) {
-  new IntersectionObserver(entries => {
-    viewerFullyVisible = entries[0].intersectionRatio >= .999;
-    syncMiniPreviewVisibility();
-  }, {threshold: [0, .25, .5, .75, 1]}).observe(viewer);
-}
-
-if (miniPreview) {
-  miniPreview.addEventListener('click', () => {
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    viewer.scrollIntoView({behavior: reduced ? 'auto' : 'smooth', block: 'center'});
-  });
-}
-
 function removeSmallComponents(target, width, height, minSize) {
   const visited = new Uint8Array(width * height);
   const queue = new Int32Array(width * height);
@@ -1538,7 +1491,6 @@ function syncControls() {
   syncPrintControls();
   updateViewerCursor();
   updateHistory();
-  syncMiniPreviewVisibility();
 }
 
 for (const id of ['brightness', 'contrast', 'threshold', 'dotsize', 'intensity']) {

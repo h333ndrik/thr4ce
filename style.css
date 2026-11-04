@@ -29,7 +29,7 @@ button:disabled{opacity:.4;cursor:wait}
 .step-photo.has-image .photo-hint{display:none}
 .step-photo.has-image .photo-body{justify-content:flex-end}
 #import-label{min-height:44px;display:inline-flex;align-items:center;justify-content:center}
-.viewer{height:420px;max-height:55vh;background:#101010;position:relative;border-radius:5px;overflow:hidden;display:grid;place-items:center;touch-action:none}
+.viewer{height:420px;max-height:55vh;background:#101010;position:sticky;top:8px;z-index:10;border-radius:5px;overflow:hidden;display:grid;place-items:center;touch-action:none;box-shadow:0 2px 12px #0002}
 .viewer.is-panning{cursor:grabbing}
 .viewer.is-drawing,.viewer.is-selecting,.viewer.is-selecting-rect{cursor:crosshair}
 .viewer.is-pan-ready{cursor:grab}
@@ -97,8 +97,6 @@ input[type=number]:disabled{opacity:.4}
 .actions{display:flex;gap:8px}
 #roll-guide{position:absolute;top:0;bottom:0;border-left:1px dashed #ff4b4b;pointer-events:none;z-index:2}
 #roll-guide span{position:absolute;top:8px;left:4px;color:#ff6b6b;background:#101010cc;padding:2px 4px;font-size:10px;white-space:nowrap;transform-origin:0 0;transform:scale(var(--inverse-zoom,1))}
-.mini-preview{position:fixed;left:16px;bottom:16px;z-index:30;display:block;padding:4px;background:#101010;border:1px solid #555;border-radius:5px;box-shadow:0 10px 30px #0005;line-height:0;cursor:pointer}
-.mini-preview canvas{display:block;width:min(180px,calc(100vw - 40px));height:auto;max-height:42vh;border-radius:3px;background:#101010}
 .export-dialog{width:min(460px,calc(100vw - 32px));max-height:calc(100vh - 32px);padding:0;border:0;background:transparent;color:inherit;overflow:visible}
 .export-dialog::backdrop{background:#101010b8}
 .export-dialog-card{padding:22px;background:#f5f5f3;border:1px solid #bdbdb8;border-radius:8px;box-shadow:0 24px 70px #0007}
@@ -114,7 +112,7 @@ input[type=number]:disabled{opacity:.4}
 .export-dialog-actions button{flex:1;min-height:44px}
 #status{font-size:12px;color:#666;margin-top:12px}
 [hidden]{display:none!important}
-@media(max-width:600px){main{padding:24px 16px}header{margin-bottom:16px}#mode-badge{display:flex;align-items:center;min-height:44px}.project-panel{right:0}.step-photo{grid-template-columns:1fr;gap:10px;padding:16px}.step-photo.has-image{grid-template-columns:1fr auto;padding:10px 0}.photo-body{justify-content:flex-start;flex-wrap:wrap}.photo-hint{text-align:left}.viewer{height:300px}.preview-meta{align-items:flex-start;flex-wrap:wrap}.preview-options{width:100%;justify-content:flex-start}.tool-switch button{font-size:11px}button,.button,.project-menu summary{min-height:44px}.refine-end{align-items:stretch;flex-direction:column}.actions{width:100%}.actions button{flex:1}.print-fields{gap:8px}.print-fields input[type=number]{width:68px}.mini-preview{left:10px;bottom:10px}.mini-preview canvas{width:min(150px,calc(100vw - 28px))}.export-dialog-card{padding:18px}.export-dialog-actions{flex-direction:column}}
+@media(max-width:600px){main{padding:24px 16px}header{margin-bottom:16px}#mode-badge{display:flex;align-items:center;min-height:44px}.project-panel{right:0}.step-photo{grid-template-columns:1fr;gap:10px;padding:16px}.step-photo.has-image{grid-template-columns:1fr auto;padding:10px 0}.photo-body{justify-content:flex-start;flex-wrap:wrap}.photo-hint{text-align:left}.preview-meta{align-items:flex-start;flex-wrap:wrap}.preview-options{width:100%;justify-content:flex-start}.tool-switch button{font-size:11px}button,.button,.project-menu summary{min-height:44px}.refine-end{align-items:stretch;flex-direction:column}.actions{width:100%}.actions button{flex:1}.print-fields{gap:8px}.print-fields input[type=number]{width:68px}.export-dialog-card{padding:18px}.export-dialog-actions{flex-direction:column}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}.h4-cursor img{transition:none}}
 .h4-cursor{position:fixed;left:0;top:0;width:22px;height:33px;z-index:2147483647;pointer-events:none;user-select:none;margin:0;padding:0;transform:translate3d(-100px,-100px,0);will-change:transform}
 .h4-cursor.is-hidden{visibility:hidden}

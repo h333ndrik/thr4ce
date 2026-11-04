@@ -27,11 +27,12 @@
 - Block 18 zone treatments: complete. Rectangle selection returns with the Select tool and a single Add zone action. Up to eight zones snapshot their method, threshold, dot size, and intensity; zone quantization is isolated to its rectangle, participates in undo/redo, projects, and evidence, and reset clears all zones.
 - Mini-block UX polish: complete. The empty image-info readout is hidden before import and revealed with live canvas data; Export is disabled at 0 images with the existing 0.4 opacity; the footer wording remains correct.
 - Mini-block favicon fallback: complete. A 16+32 px `favicon.ico` generated from the thr wordmark is linked explicitly and precached by service worker `thr4ce-v14`.
-- Device-feedback UX pass: complete. Imported images fit fully inside the viewer before the normal 25% minimum applies, the zoom controls have an explicit stacking layer and isolated pointer handlers, the loupe was removed, rotation moved beside Mirror and Reset, and a clickable sticky mini-preview follows scroll position.
+- Device-feedback UX pass: complete. Imported images fit fully inside the viewer before the normal 25% minimum applies, the zoom controls have an explicit stacking layer and isolated pointer handlers, the loupe was removed, and rotation moved beside Mirror and Reset.
+- Sticky-viewer pass: complete. The full-size viewer stays pinned 8 px from the viewport edge while Tone, Dithering, Brush, and Transform scroll beneath it; it releases with the main containing block. The mini-preview, its canvas copy, render hook, observer, and CSS were removed.
 - Export now opens a summary dialog for size, resolution, inversion, and rotation with separate PNG and `.stencil.json` downloads. Preset feedback names the applied treatment, and the Ghost/Despeckle tooltips use the requested wording.
 - The h4 cursor now hides on window blur and document mouseleave, uses one rAF-driven `translate3d` update, remains in the dialog top layer while it is open, and preserves the ready class and `cursor:none` rule across dialogs and dynamic elements.
 - Blocks 0–18 plus the device-feedback UX pass are complete. The optional Block 16 was not separately present; the loupe from the earlier mini-block was removed after device feedback.
-- Service worker cache is `thr4ce-v15`; all 14 precache entries resolve, the old cache is removed, and an offline reload succeeds.
+- Service worker cache is `thr4ce-v16`; all 14 precache entries resolve, the old cache is removed, and an offline reload succeeds.
 - Block 8 verification: `node --check` passed for `app.js`, `cursor.js`, and `sw.js`; manifest and installability errors were empty; the service worker activated and controlled the page; 192, 512, and 180 px icons rendered; Add-to-Home-Screen metadata was present; a full offline reload loaded the app from `thr4ce-v1`.
 
 ## In progress

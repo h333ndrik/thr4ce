@@ -46,7 +46,7 @@ Import a photo or flash artwork. Choose a threshold or dithering treatment to ma
 - Mirror artwork for stencil transfer.
 - Zoom from 25–800% after import, fit to view, and pan with Hand, Space-drag, or touch.
 - Pinch to zoom and double-click or double-tap to fit.
-- Keep a clickable mini-preview visible while the main viewer is scrolled away.
+- Keep the full-size viewer pinned near the top of the viewport while the Tone, Dithering, Brush, and Transform controls scroll beneath it.
 - Undo and redo up to 50 edits.
 - Define print width and height in millimetres, centimetres, or inches.
 - Print at 203 dpi for thermal output, 300 dpi, 600 dpi, or a custom resolution.
