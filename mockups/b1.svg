@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" role="img" aria-labelledby="title desc">
+<title id="title">thr4ce layout variant B1 desktop</title>
+<desc id="desc">Static desktop mockup with image viewer on the left and a continuous scrollable control panel on the right.</desc>
+<defs>
+<radialGradient id="pageGlow" cx="85%" cy="5%" r="65%"><stop offset="0" stop-color="#e9e7ee" stop-opacity=".4"/><stop offset="1" stop-color="#e9e7ee" stop-opacity="0"/></radialGradient>
+<clipPath id="panelClip"><rect x="1120" y="56" width="314" height="804"/></clipPath>
+</defs>
+<rect x="0" y="0" width="1440" height="900" fill="#f5f5f3"/>
+<rect x="0" y="0" width="1440" height="900" fill="url(#pageGlow)"/>
+<g opacity=".16" stroke="#bdbdb8" stroke-width="1">
+<line x1="0" y1="0" x2="0" y2="900" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="60" y1="0" x2="60" y2="900" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="120" y1="0" x2="120" y2="900" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="180" y1="0" x2="180" y2="900" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="240" y1="0" x2="240" y2="900" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="300" y1="0" x2="300" y2="900" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="360" y1="0" x2="360" y2="900" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="420" y1="0" x2="420" y2="900" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="480" y1="0" x2="480" y2="900" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="540" y1="0" x2="540" y2="900" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="600" y1="0" x2="600" y2="900" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="660" y1="0" x2="660" y2="900" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="720" y1="0" x2="720" y2="900" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="780" y1="0" x2="780" y2="900" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="840" y1="0" x2="840" y2="900" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="900" y1="0" x2="900" y2="900" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="960" y1="0" x2="960" y2="900" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="1020" y1="0" x2="1020" y2="900" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="1080" y1="0" x2="1080" y2="900" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="1140" y1="0" x2="1140" y2="900" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="1200" y1="0" x2="1200" y2="900" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="1260" y1="0" x2="1260" y2="900" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="1320" y1="0" x2="1320" y2="900" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="1380" y1="0" x2="1380" y2="900" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="1440" y1="0" x2="1440" y2="900" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="0" y1="0" x2="1440" y2="0" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="0" y1="50" x2="1440" y2="50" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="0" y1="100" x2="1440" y2="100" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="0" y1="150" x2="1440" y2="150" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="0" y1="200" x2="1440" y2="200" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="0" y1="250" x2="1440" y2="250" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="0" y1="300" x2="1440" y2="300" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="0" y1="350" x2="1440" y2="350" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="0" y1="400" x2="1440" y2="400" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="0" y1="450" x2="1440" y2="450" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="0" y1="500" x2="1440" y2="500" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="0" y1="550" x2="1440" y2="550" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="0" y1="600" x2="1440" y2="600" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="0" y1="650" x2="1440" y2="650" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="0" y1="700" x2="1440" y2="700" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="0" y1="750" x2="1440" y2="750" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="0" y1="800" x2="1440" y2="800" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="0" y1="850" x2="1440" y2="850" stroke="#bdbdb8" stroke-width="1"/>
+<line x1="0" y1="900" x2="1440" y2="900" stroke="#bdbdb8" stroke-width="1"/>
+</g>
+<rect x="0" y="0" width="1440" height="56" fill="#f5f5f3"/>
+<line x1="0" y1="56" x2="1440" y2="56" stroke="#dddddd" stroke-width="1"/>
+<text x="24" y="35" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="600" fill="#242424" text-anchor="start" letter-spacing="1.7">thr4ce</text>
+<rect x="97" y="12" width="32" height="32" fill="none" stroke="#d2d2ce" stroke-width="1" rx="4" opacity="0.4"/>
+<text x="113" y="34" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#242424" text-anchor="middle" opacity="0.4">↶</text>
+<rect x="141" y="12" width="32" height="32" fill="none" stroke="#d2d2ce" stroke-width="1" rx="4" opacity="0.4"/>
+<text x="157" y="34" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#242424" text-anchor="middle" opacity="0.4">↷</text>
+<text x="1085" y="33" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="500" fill="#242424" text-anchor="start" letter-spacing="1.2">SHORTCUTS</text>
+<text x="1180" y="33" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="500" fill="#242424" text-anchor="start" letter-spacing="1.2">FULL</text>
+<rect x="1231" y="11" width="98" height="34" fill="#f5f5f3" stroke="#d2d2ce" stroke-width="1" rx="4"/>
+<text x="1280.0" y="32.08" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#242424" text-anchor="middle" letter-spacing="0">Import image</text>
+<rect x="1341" y="11" width="75" height="34" fill="#252525" stroke="#252525" stroke-width="1" rx="4"/>
+<text x="1378.5" y="32.08" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#ffffff" text-anchor="middle" letter-spacing="0">Export…</text>
+<rect x="0" y="56" width="1120" height="804" fill="#101010"/>
+<rect x="202" y="189" width="717" height="538" fill="#e8e8e4" stroke="#bcbcb7" stroke-width="1"/>
+<line x1="237" y1="339" x2="882" y2="577" stroke="#777777" stroke-width="1" opacity="0.62"/>
+<line x1="237" y1="577" x2="882" y2="339" stroke="#777777" stroke-width="1" opacity="0.62"/>
+<rect x="493" y="443" width="135" height="26" fill="#e8e8e4"/>
+<text x="560" y="461" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#777777" text-anchor="middle">image preview</text>
+<rect x="18" y="74" width="174" height="38" fill="#101010" stroke="#333333" stroke-width="1" rx="5" opacity="0.8"/>
+<rect x="23" y="79" width="57" height="28" fill="#f5f5f3" stroke="#d2d2ce" stroke-width="1" rx="4"/>
+<text x="51.5" y="96.4" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="400" fill="#242424" text-anchor="middle" letter-spacing="0">PHOTO</text>
+<rect x="81" y="79" width="66" height="28" fill="#252525" stroke="#252525" stroke-width="1" rx="4"/>
+<text x="114.0" y="96.4" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="400" fill="#ffffff" text-anchor="middle" letter-spacing="0">STENCIL</text>
+<rect x="160" y="77" width="32" height="32" fill="#101010" stroke="#333333" stroke-width="1" rx="4" opacity="0.8"/>
+<text x="176" y="99" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#dddddd" text-anchor="middle">◐</text>
+<line x1="694.4" y1="56" x2="694.4" y2="860" stroke="#ff4b4b" stroke-width="1" stroke-dasharray="4 4"/>
+<rect x="700" y="64" width="52" height="18" fill="#101010" opacity="0.8"/>
+<text x="706" y="77" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="400" fill="#ff6b6b" text-anchor="start">58 mm</text>
+<rect x="18" y="768" width="178" height="38" fill="#101010" stroke="#333333" stroke-width="1" rx="5" opacity="0.8"/>
+<rect x="23" y="773" width="57" height="28" fill="#252525" stroke="#252525" stroke-width="1" rx="4"/>
+<text x="51.5" y="790.4" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="400" fill="#ffffff" text-anchor="middle" letter-spacing="0">BRUSH</text>
+<rect x="80" y="773" width="50" height="28" fill="#f5f5f3" stroke="#d2d2ce" stroke-width="1" rx="4"/>
+<text x="105.0" y="790.4" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="400" fill="#242424" text-anchor="middle" letter-spacing="0">HAND</text>
+<rect x="130" y="773" width="62" height="28" fill="#f5f5f3" stroke="#d2d2ce" stroke-width="1" rx="4"/>
+<text x="161.0" y="790.4" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="400" fill="#242424" text-anchor="middle" letter-spacing="0">SELECT</text>
+<rect x="18" y="814" width="80" height="28" fill="#101010" stroke="#333333" stroke-width="1" rx="4" opacity="0.8"/>
+<text x="58" y="832" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="400" fill="#dddddd" text-anchor="middle" letter-spacing="0.7">COMPARE</text>
+<rect x="933" y="804" width="169" height="38" fill="#101010" stroke="#333333" stroke-width="1" rx="5" opacity="0.8"/>
+<text x="951" y="828" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#dddddd" text-anchor="middle">−</text>
+<text x="995" y="827" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="400" fill="#aaaaaa" text-anchor="middle">250%</text>
+<text x="1047" y="827" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="400" fill="#dddddd" text-anchor="middle" letter-spacing="0.7">FIT</text>
+<text x="1084" y="828" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#dddddd" text-anchor="middle">+</text>
+<rect x="1120" y="56" width="320" height="804" fill="#f5f5f3"/>
+<line x1="1120" y1="56" x2="1120" y2="860" stroke="#dddddd" stroke-width="1"/>
+<rect x="1434" y="56" width="6" height="804" fill="#ecece8"/>
+<line x1="1434" y1="56" x2="1434" y2="860" stroke="#dddddd" stroke-width="1"/>
+<rect x="1435" y="360" width="4" height="370" fill="#b7b7b2" rx="2"/>
+<g clip-path="url(#panelClip)">
+<rect x="1141" y="56" width="281" height="38" fill="#f5f5f3"/>
+<line x1="1141" y1="94" x2="1422" y2="94" stroke="#dddddd" stroke-width="1"/>
+<text x="1141" y="78" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="500" fill="#8a8a86" text-anchor="start" letter-spacing="1.2">DITHER</text>
+<text x="1422" y="78" font-family="Arial, Helvetica, sans-serif" font-size="9" font-weight="400" fill="#8a8a86" text-anchor="end" letter-spacing="0.7">REPLACES THRESHOLD</text>
+<rect x="1141" y="98" width="41.9" height="31" fill="#f5f5f3" stroke="#d2d2ce" stroke-width="1" rx="4"/>
+<text x="1161.95" y="116.9" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="400" fill="#242424" text-anchor="middle" letter-spacing="0">clean</text>
+<rect x="1190.9" y="98" width="41.4" height="31" fill="#f5f5f3" stroke="#d2d2ce" stroke-width="1" rx="4"/>
+<text x="1211.6" y="116.9" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="400" fill="#242424" text-anchor="middle" letter-spacing="0">news</text>
+<rect x="1240.3" y="98" width="34.1" height="31" fill="#f5f5f3" stroke="#d2d2ce" stroke-width="1" rx="4"/>
+<text x="1257.35" y="116.9" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="400" fill="#242424" text-anchor="middle" letter-spacing="0">half</text>
+<rect x="1282.4" y="98" width="42.5" height="31" fill="#f5f5f3" stroke="#d2d2ce" stroke-width="1" rx="4"/>
+<text x="1303.65" y="116.9" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="400" fill="#242424" text-anchor="middle" letter-spacing="0">xerox</text>
+<rect x="1332.8" y="98" width="34.1" height="31" fill="#f5f5f3" stroke="#d2d2ce" stroke-width="1" rx="4"/>
+<text x="1349.85" y="116.9" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="400" fill="#242424" text-anchor="middle" letter-spacing="0">riso</text>
+<rect x="1375" y="98" width="44.7" height="31" fill="#f5f5f3" stroke="#d2d2ce" stroke-width="1" rx="4"/>
+<text x="1397.35" y="116.9" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="400" fill="#242424" text-anchor="middle" letter-spacing="0">decay</text>
+<rect x="1141" y="136" width="281" height="34" fill="#f5f5f3" stroke="#d2d2ce" stroke-width="1" rx="4"/>
+<text x="1151" y="158" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="400" fill="#242424" text-anchor="start">↻ randomize</text>
+<line x1="1141" y1="213" x2="1422" y2="213" stroke="#dddddd" stroke-width="1"/>
+<text x="1141" y="234" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="500" fill="#8a8a86" text-anchor="start" letter-spacing="1.2">ZONES</text>
+<text x="1422" y="234" font-family="Arial, Helvetica, sans-serif" font-size="9" font-weight="400" fill="#8a8a86" text-anchor="end" letter-spacing="0.7">OVERRIDES DITHER INSIDE</text>
+<rect x="1141" y="260" width="79.4" height="44" fill="#f5f5f3" stroke="#d2d2ce" stroke-width="1" rx="4"/>
+<text x="1180.7" y="285.74" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="400" fill="#242424" text-anchor="middle" letter-spacing="0">add zone</text>
+<rect x="1141" y="314" width="101.8" height="31" fill="#f5f5f3" stroke="#d2d2ce" stroke-width="1" rx="4"/>
+<text x="1191.9" y="332.9" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="400" fill="#242424" text-anchor="middle" letter-spacing="0">zone 1 · bayer ×</text>
+<rect x="1250.8" y="314" width="121.4" height="31" fill="#f5f5f3" stroke="#d2d2ce" stroke-width="1" rx="4"/>
+<text x="1311.5" y="332.9" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="400" fill="#242424" text-anchor="middle" letter-spacing="0">zone 2 · round-dot ×</text>
+<line x1="1141" y1="391" x2="1422" y2="391" stroke="#dddddd" stroke-width="1"/>
+<text x="1141" y="412" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="500" fill="#8a8a86" text-anchor="start" letter-spacing="1.2">BRUSH</text>
+<text x="1422" y="412" font-family="Arial, Helvetica, sans-serif" font-size="9" font-weight="400" fill="#8a8a86" text-anchor="end" letter-spacing="0.7">BREAK WITH INTENTION</text>
+<rect x="1141" y="437" width="45" height="34" fill="#252525" stroke="#252525" stroke-width="1" rx="4"/>
+<text x="1163.5" y="457.4" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="400" fill="#ffffff" text-anchor="middle" letter-spacing="0">break</text>
+<rect x="1186" y="437" width="45" height="34" fill="#f5f5f3" stroke="#d2d2ce" stroke-width="1"/>
+<text x="1208.5" y="457.4" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="400" fill="#242424" text-anchor="middle" letter-spacing="0">thin</text>
+<rect x="1231" y="437" width="39" height="34" fill="#f5f5f3" stroke="#d2d2ce" stroke-width="1"/>
+<text x="1250.5" y="457.4" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="400" fill="#242424" text-anchor="middle" letter-spacing="0">fatten</text>
+<rect x="1270" y="437" width="43" height="34" fill="#f5f5f3" stroke="#d2d2ce" stroke-width="1"/>
+<text x="1291.5" y="457.4" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="400" fill="#242424" text-anchor="middle" letter-spacing="0">dissolve</text>
+<rect x="1313" y="437" width="45" height="34" fill="#f5f5f3" stroke="#d2d2ce" stroke-width="1"/>
+<text x="1335.5" y="457.4" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="400" fill="#242424" text-anchor="middle" letter-spacing="0">restore</text>
+<text x="1141" y="494" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#242424" text-anchor="start">radius</text>
+<text x="1422" y="494" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#555555" text-anchor="end">12</text>
+<line x1="1141" y1="509" x2="1422" y2="509" stroke="#b9b9b4" stroke-width="1"/>
+<rect x="1185.27" y="505.5" width="7" height="7" fill="#555" stroke="none" stroke-width="0" rx="1"/>
+<text x="1141" y="529" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#242424" text-anchor="start">strength</text>
+<text x="1422" y="529" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#555555" text-anchor="end">50</text>
+<line x1="1141" y1="543" x2="1422" y2="543" stroke="#b9b9b4" stroke-width="1"/>
+<rect x="1278.0" y="539.5" width="7" height="7" fill="#555" stroke="none" stroke-width="0" rx="1"/>
+<text x="1141" y="563" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#242424" text-anchor="start">scatter</text>
+<text x="1422" y="563" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#555555" text-anchor="end">0</text>
+<line x1="1141" y1="577" x2="1422" y2="577" stroke="#b9b9b4" stroke-width="1"/>
+<rect x="1137.5" y="573.5" width="7" height="7" fill="#555" stroke="none" stroke-width="0" rx="1"/>
+<rect x="1141" y="588" width="14" height="14" fill="#f5f5f3" stroke="#555555" stroke-width="1" rx="2"/>
+<text x="1148" y="599" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="400" fill="#242424" text-anchor="middle">✓</text>
+<text x="1165" y="599" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="400" fill="#666666" text-anchor="start">ghost overlay</text>
+<rect x="1141" y="610" width="14" height="14" fill="#f5f5f3" stroke="#555555" stroke-width="1" rx="2"/>
+<text x="1165" y="621" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="400" fill="#666666" text-anchor="start">despeckle</text>
+<line x1="1141" y1="667" x2="1422" y2="667" stroke="#dddddd" stroke-width="1"/>
+<text x="1141" y="689" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="500" fill="#8a8a86" text-anchor="start" letter-spacing="1.2">TRANSFORM</text>
+<text x="1422" y="689" font-family="Arial, Helvetica, sans-serif" font-size="9" font-weight="400" fill="#8a8a86" text-anchor="end" letter-spacing="0.7">NOTHING REMOVED</text>
+<rect x="1141" y="713" width="50.7" height="34" fill="#f5f5f3" stroke="#d2d2ce" stroke-width="1" rx="4"/>
+<text x="1166.35" y="733.74" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="400" fill="#242424" text-anchor="middle" letter-spacing="0">mirror</text>
+<rect x="1199.7" y="713" width="69.8" height="34" fill="#f5f5f3" stroke="#d2d2ce" stroke-width="1" rx="4"/>
+<text x="1234.6" y="733.74" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="400" fill="#242424" text-anchor="middle" letter-spacing="0">rotate 90°</text>
+<rect x="1277.5" y="713" width="46.5" height="34" fill="#f5f5f3" stroke="#d2d2ce" stroke-width="1" rx="4"/>
+<text x="1300.75" y="733.74" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="400" fill="#242424" text-anchor="middle" letter-spacing="0">reset</text>
+<line x1="1141" y1="790" x2="1422" y2="790" stroke="#dddddd" stroke-width="1"/>
+<text x="1141" y="813" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="500" fill="#8a8a86" text-anchor="start" letter-spacing="1.2">PRINT</text>
+<text x="1422" y="813" font-family="Arial, Helvetica, sans-serif" font-size="9" font-weight="400" fill="#8a8a86" text-anchor="end" letter-spacing="0.7">203 DPI · 58 MM</text>
+<text x="1141" y="847" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="400" fill="#666666" text-anchor="start">width</text>
+<text x="1296.5" y="847" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="400" fill="#666666" text-anchor="start">height</text>
+<rect x="1141" y="856" width="125.5" height="34" fill="#ffffff" stroke="#d2d2ce" stroke-width="1" rx="4"/>
+<rect x="1296.5" y="856" width="125.5" height="34" fill="#ffffff" stroke="#d2d2ce" stroke-width="1" rx="4"/>
+</g>
+<line x1="0" y1="860" x2="1440" y2="860" stroke="#dddddd" stroke-width="1"/>
+<rect x="0" y="861" width="1440" height="39" fill="#f5f5f3"/>
+<text x="24" y="884" font-family="Arial, Helvetica, sans-serif" font-size="11.5" font-weight="400" fill="#777777" text-anchor="start">thresh 45 · round-dot · dot 6 · 41% ink · 250%</text>
+</svg>

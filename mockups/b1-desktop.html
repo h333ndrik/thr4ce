@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>thr4ce · B1 desktop</title>
+<style>
+:root{font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#242424;background:#f5f5f3;--hair:#d2d2ce;--section:#ddd;--muted:#777;--label:#8a8a86;--chrome:#101010cc;--chrome-line:#333;--section-gap:30px;--control-gap:8px}
+*{box-sizing:border-box}
+html,body{width:100%;height:100%;margin:0;overflow:hidden}
+body{background:radial-gradient(ellipse at 85% 5%,#e9e7ee66,transparent 65%),#f5f5f3}
+.app{height:100vh;display:grid;grid-template-columns:minmax(0,1fr) 320px;grid-template-rows:56px minmax(0,1fr) 40px}
+.header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:0 24px;border-bottom:1px solid var(--section);background:#f5f5f3e8}
+.header-left,.header-actions{display:flex;align-items:center;gap:12px}
+.brand{margin:0;font-size:17px;font-weight:600;letter-spacing:.1em;line-height:1}
+.icon-btn{width:32px;height:32px;padding:0;border:1px solid var(--hair);border-radius:4px;background:transparent;font-size:17px;line-height:1}
+.header-left .icon-btn{opacity:.4}
+.text-action{padding:8px 5px;border:0;background:transparent;font-size:10px;letter-spacing:.12em;font-weight:500;text-transform:uppercase}
+.button{min-height:34px;padding:8px 13px;border:1px solid var(--hair);border-radius:4px;background:transparent;font:inherit;font-size:12px;color:inherit;white-space:nowrap}
+.button.primary{border-color:#252525;background:#252525;color:#fff}
+.viewer{grid-column:1;grid-row:2;position:relative;overflow:hidden;background:#101010}
+.preview-card{position:absolute;left:50%;top:50%;width:min(64%,720px);aspect-ratio:4/3;transform:translate(-50%,-50%);border:1px solid #bcbcb7;background:#e8e8e4;color:#777;display:grid;place-items:center}
+.preview-card::before,.preview-card::after{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:#7778;transform-origin:center}
+.preview-card::before{transform:rotate(18deg)}.preview-card::after{transform:rotate(-18deg)}
+.preview-card span{position:relative;z-index:1;padding:4px 7px;background:#e8e8e4;font-size:12px;letter-spacing:.04em}
+.overlay{position:absolute;z-index:3;display:flex;align-items:center;gap:8px;color:#ddd;font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-variant-numeric:tabular-nums}
+.viewer-top{top:18px;left:18px}.viewer-tools{left:18px;bottom:18px;align-items:flex-start;flex-direction:column;gap:8px}.viewer-zoom{right:18px;bottom:18px}
+.chrome{display:flex;align-items:center;border:1px solid var(--chrome-line);border-radius:5px;background:var(--chrome);padding:4px}
+.chrome button{min-height:28px;padding:5px 9px;border:0;border-radius:3px;background:transparent;color:#ddd;font:inherit;font-size:10px;letter-spacing:.08em;text-transform:uppercase}
+.chrome button.active{background:#f5f5f3;color:#242424}
+.chrome .divider{width:1px;height:18px;background:#444}
+.polarity{width:32px;height:32px;border:1px solid var(--chrome-line);border-radius:4px;background:var(--chrome);color:#ddd;font-size:15px}
+.compare{align-self:flex-start;padding:7px 11px;border:1px solid var(--chrome-line);border-radius:4px;background:var(--chrome);color:#ddd;font:inherit;font-size:10px;letter-spacing:.08em;text-transform:uppercase}
+.zoom-readout{min-width:50px;padding:0 4px;text-align:center;color:#aaa;font-size:10px}
+.guide{position:absolute;left:62%;top:0;bottom:0;border-left:1px dashed #ff4b4b;pointer-events:none;z-index:2}
+.guide span{position:absolute;top:8px;left:5px;padding:2px 4px;background:#101010cc;color:#ff6b6b;font-size:10px;white-space:nowrap}
+.panel{grid-column:2;grid-row:2;min-height:0;border-left:1px solid var(--section);background:#f5f5f3}
+.panel-scroll{height:100%;overflow-x:hidden;overflow-y:scroll;scrollbar-gutter:stable;scrollbar-width:thin;scrollbar-color:#b7b7b2 #ecece8;padding:0 18px 18px 20px}
+.panel-scroll::-webkit-scrollbar{width:6px}.panel-scroll::-webkit-scrollbar-track{background:#ecece8;border-left:1px solid var(--section)}.panel-scroll::-webkit-scrollbar-thumb{background:#b7b7b2;border-radius:0}
+.section{border-top:1px solid var(--section);padding:0 0 12px}
+.section + .section{margin-top:var(--section-gap)}
+.section-head{position:sticky;top:0;z-index:4;display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:8px;padding:15px 0 11px;background:#f5f5f3;box-shadow:0 1px 0 var(--section)}
+.section-head h2{margin:0;font-size:10px;line-height:1.2;letter-spacing:.12em;font-weight:500;text-transform:uppercase;color:var(--label)}
+.section-head span{font-size:9px;line-height:1.2;letter-spacing:.08em;text-transform:uppercase;color:var(--label);text-align:right;white-space:nowrap}
+.ctl + .ctl{margin-top:var(--control-gap)}
+.ctl-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:12px;line-height:1.2}
+.ctl-head output,.value{font-variant-numeric:tabular-nums;color:#555}
+.slider{position:relative;height:1px;margin:11px 0 5px;background:#b9b9b4}
+.slider i{position:absolute;top:-3px;width:7px;height:7px;margin-left:-3px;background:#555;border-radius:1px}
+.button-row,.segmented,.chips{display:flex;flex-wrap:wrap;gap:8px}
+.button-row .button,.segmented button,.chip{min-height:34px;padding:7px 10px;border:1px solid var(--hair);border-radius:4px;background:transparent;font:inherit;font-size:11px;color:inherit;text-transform:lowercase}
+.segmented{gap:0;flex-wrap:nowrap}
+.segmented button{flex:1;min-width:0;border-radius:0;padding:7px 5px;white-space:nowrap}
+.segmented button:first-child{border-radius:4px 0 0 4px}.segmented button:last-child{border-radius:0 4px 4px 0}.segmented button + button{border-left:0}
+.segmented button.active{background:#252525;border-color:#252525;color:#fff}
+.presets{margin-top:10px}.presets button{min-height:31px;padding:6px 8px;font-size:10px}
+.randomize{width:100%;margin-top:8px;min-height:34px;padding:7px 10px;border:1px solid var(--hair);border-radius:4px;background:transparent;text-align:left;font:inherit;font-size:11px}
+.add-zone{min-height:44px;padding:10px 14px}.chip{min-height:34px;padding:7px 10px;background:#fff9;font-variant-numeric:tabular-nums}.chip b{font-weight:400;color:#777}
+.checks{display:grid;gap:8px;margin-top:10px;font-size:11px;color:#666}.checks label{display:flex;align-items:center;gap:8px}.checks input{width:14px;height:14px;margin:0;accent-color:#555}
+.print-grid{display:grid;grid-template-columns:1fr 14px 1fr;gap:8px;align-items:end}.field span{display:block;margin-bottom:6px;font-size:11px;color:#666}.field input{width:100%;height:34px;padding:7px 8px;border:1px solid var(--hair);border-radius:4px;background:#fff;font:inherit;font-size:12px;font-variant-numeric:tabular-nums}.times{padding-bottom:9px;text-align:center;color:#999}
+.print-primary{width:100%;margin-top:12px;min-height:40px;border:1px solid #252525;border-radius:4px;background:#252525;color:#fff;font:inherit;font-size:12px}
+.status{grid-column:1/-1;grid-row:3;display:flex;align-items:center;padding:0 24px;border-top:1px solid var(--section);background:#f5f5f3e8;color:var(--muted);font-size:11.5px;font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="header">
+    <div class="header-left">
+      <h1 class="brand">thr4ce</h1>
+      <button class="icon-btn" disabled aria-label="Undo">↶</button>
+      <button class="icon-btn" disabled aria-label="Redo">↷</button>
+    </div>
+    <div class="header-actions">
+      <button class="text-action">Shortcuts</button>
+      <button class="text-action">Full</button>
+      <button class="button">Import image</button>
+      <button class="button primary">Export…</button>
+    </div>
+  </header>
+
+  <main class="viewer" aria-label="Viewer layout preview">
+    <div class="preview-card"><span>image preview</span></div>
+    <div class="overlay viewer-top">
+      <div class="chrome">
+        <button>photo</button><span class="divider"></span><button class="active">stencil</button>
+      </div>
+      <button class="polarity" aria-label="Toggle polarity">◐</button>
+    </div>
+    <div class="overlay viewer-tools">
+      <div class="chrome"><button class="active">Brush</button><button>Hand</button><button>Select</button></div>
+      <button class="compare">Compare</button>
+    </div>
+    <div class="overlay viewer-zoom chrome"><button>−</button><span class="zoom-readout">250%</span><button>Fit</button><button>+</button></div>
+    <div class="guide"><span>58 mm</span></div>
+  </main>
+
+  <aside class="panel" aria-label="Control panel">
+    <div class="panel-scroll">
+      <section class="section" data-section="IMAGE">
+        <div class="section-head"><h2>Image</h2><span>BILD.JPG · 2400 × 1702</span></div>
+        <button class="button add-zone">Import image</button>
+      </section>
+      <section class="section" data-section="TONE">
+        <div class="section-head"><h2>Tone</h2><span>Before the mask</span></div>
+        <div class="ctl"><div class="ctl-head"><span>brightness</span><output>0</output></div><div class="slider"><i style="left:50%"></i></div></div>
+        <div class="ctl"><div class="ctl-head"><span>contrast</span><output>0</output></div><div class="slider"><i style="left:50%"></i></div></div>
+        <div class="ctl"><div class="ctl-head"><span>black point</span><output>0</output></div><div class="slider"><i style="left:2%"></i></div></div>
+        <div class="ctl"><div class="ctl-head"><span>white point</span><output>100</output></div><div class="slider"><i style="left:98%"></i></div></div>
+        <div class="ctl"><div class="ctl-head"><span>pre-blur</span><output>0 px</output></div><div class="slider"><i style="left:2%"></i></div></div>
+      </section>
+      <section class="section" data-section="THRESHOLD">
+        <div class="section-head"><h2>Threshold</h2><span>Auto · Otsu</span></div>
+        <div class="ctl"><div class="ctl-head"><span>threshold</span><output>off</output></div><div class="slider"><i style="left:0"></i></div></div>
+        <div class="button-row" style="margin-top:10px"><button class="button">auto threshold</button></div>
+      </section>
+      <section class="section" data-section="DITHER">
+        <div class="section-head"><h2>Dither</h2><span>Replaces threshold</span></div>
+        <div class="segmented"><button>none</button><button>floyd</button><button>jarvis</button><button>bayer</button><button class="active">round</button></div>
+        <div class="ctl" style="margin-top:12px"><div class="ctl-head"><span>dot size</span><output>6</output></div><div class="slider"><i style="left:33%"></i></div></div>
+        <div class="ctl"><div class="ctl-head"><span>intensity</span><output>50</output></div><div class="slider"><i style="left:50%"></i></div></div>
+        <div class="button-row presets"><button class="chip">clean</button><button class="chip">news</button><button class="chip">half</button><button class="chip">xerox</button><button class="chip">riso</button><button class="chip">decay</button></div>
+        <button class="randomize">↻ randomize</button>
+      </section>
+      <section class="section" data-section="ZONES">
+        <div class="section-head"><h2>Zones</h2><span>Overrides dither inside</span></div>
+        <button class="button add-zone">add zone</button>
+        <div class="chips" style="margin-top:10px"><span class="chip">zone 1 · bayer <b>×</b></span><span class="chip">zone 2 · round-dot <b>×</b></span></div>
+      </section>
+      <section class="section" data-section="BRUSH">
+        <div class="section-head"><h2>Brush</h2><span>Break with intention</span></div>
+        <div class="segmented"><button class="active">break</button><button>thin</button><button>fatten</button><button>dissolve</button><button>restore</button></div>
+        <div class="ctl" style="margin-top:12px"><div class="ctl-head"><span>radius</span><output>12</output></div><div class="slider"><i style="left:17%"></i></div></div>
+        <div class="ctl"><div class="ctl-head"><span>strength</span><output>50</output></div><div class="slider"><i style="left:50%"></i></div></div>
+        <div class="ctl"><div class="ctl-head"><span>scatter</span><output>0</output></div><div class="slider"><i style="left:0"></i></div></div>
+        <div class="checks"><label><input type="checkbox" checked> ghost overlay</label><label><input type="checkbox"> despeckle</label></div>
+      </section>
+      <section class="section" data-section="TRANSFORM">
+        <div class="section-head"><h2>Transform</h2><span>Nothing removed</span></div>
+        <div class="button-row"><button class="button">mirror</button><button class="button">rotate 90°</button><button class="button">reset</button></div>
+      </section>
+      <section class="section" data-section="PRINT">
+        <div class="section-head"><h2>Print</h2><span>203 dpi · 58 mm</span></div>
+        <div class="print-grid"><label class="field"><span>width</span><input value="100"></label><span class="times">×</span><label class="field"><span>height</span><input value="75"></label></div>
+        <div class="segmented" style="margin-top:10px"><button class="active">mm</button><button>cm</button><button>inch</button></div>
+        <div class="segmented" style="margin-top:8px"><button class="active">203</button><button>300</button><button>600</button><button>custom</button></div>
+        <div class="checks"><label><input type="checkbox"> invert · white on black</label></div>
+        <button class="print-primary">Export…</button>
+      </section>
+      <div style="height:70px"></div>
+    </div>
+  </aside>
+
+  <footer class="status">thresh 45 · round-dot · dot 6 · 41% ink · 250%</footer>
+</div>
+<script>
+const scrollArea = document.querySelector('.panel-scroll');
+const dither = scrollArea.querySelector('[data-section="DITHER"]');
+scrollArea.scrollTop = dither.offsetTop - scrollArea.offsetTop + 123;
+</script>
+</body>
+</html>

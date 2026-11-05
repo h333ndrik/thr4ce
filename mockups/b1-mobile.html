@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>thr4ce · B1 mobile</title>
+<style>
+:root{font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#242424;background:#f5f5f3;--hair:#d2d2ce;--section:#ddd;--muted:#777;--label:#8a8a86;--chrome:#101010cc;--chrome-line:#333;--section-gap:30px;--control-gap:8px}
+*{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;overflow:hidden}body{background:radial-gradient(ellipse at 85% 5%,#e9e7ee66,transparent 65%),#f5f5f3}
+.app{width:100%;max-width:100vw;height:100vh;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:56px 44vh 44px minmax(0,1fr) 40px;overflow:hidden}
+.header{display:flex;min-width:0;align-items:center;justify-content:space-between;gap:10px;padding:0 16px;border-bottom:1px solid var(--section);background:#f5f5f3e8}
+.header-left,.header-actions{display:flex;align-items:center;gap:7px}.brand{margin:0;font-size:16px;font-weight:600;letter-spacing:.1em;line-height:1}.icon-btn{width:30px;height:30px;padding:0;border:1px solid var(--hair);border-radius:4px;background:transparent;font-size:16px;line-height:1;opacity:.4}.button{min-height:32px;padding:7px 10px;border:1px solid var(--hair);border-radius:4px;background:transparent;font:inherit;font-size:11px;color:inherit;white-space:nowrap}.button.primary{border-color:#252525;background:#252525;color:#fff}
+.viewer{position:relative;min-width:0;width:100%;overflow:hidden;background:#101010}.preview-card{position:absolute;left:50%;top:50%;width:74%;aspect-ratio:4/3;transform:translate(-50%,-50%);border:1px solid #bcbcb7;background:#e8e8e4;color:#777;display:grid;place-items:center;font-size:11px}.preview-card::before,.preview-card::after{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:#7778;transform-origin:center}.preview-card::before{transform:rotate(18deg)}.preview-card::after{transform:rotate(-18deg)}.preview-card span{position:relative;z-index:1;padding:3px 6px;background:#e8e8e4}
+.overlay{position:absolute;z-index:3;display:flex;align-items:center;gap:5px;color:#ddd;font-size:9px;letter-spacing:.06em;text-transform:uppercase;font-variant-numeric:tabular-nums}.viewer-top{top:12px;left:12px}.viewer-tools{left:12px;bottom:12px;flex-direction:column;align-items:flex-start;gap:6px}.viewer-zoom{right:12px;bottom:12px}
+.chrome{display:flex;align-items:center;border:1px solid var(--chrome-line);border-radius:4px;background:var(--chrome);padding:3px}.chrome button{min-height:26px;padding:4px 7px;border:0;border-radius:2px;background:transparent;color:#ddd;font:inherit;font-size:9px;letter-spacing:.06em;text-transform:uppercase}.chrome button.active{background:#f5f5f3;color:#242424}.chrome .divider{width:1px;height:16px;background:#444}.polarity{width:28px;height:28px;border:1px solid var(--chrome-line);border-radius:4px;background:var(--chrome);color:#ddd;font-size:13px}.compare{align-self:flex-start;padding:6px 8px;border:1px solid var(--chrome-line);border-radius:4px;background:var(--chrome);color:#ddd;font:inherit;font-size:9px;letter-spacing:.06em;text-transform:uppercase}.zoom-readout{min-width:38px;padding:0 2px;text-align:center;color:#aaa;font-size:9px}.guide{position:absolute;left:62%;top:0;bottom:0;border-left:1px dashed #ff4b4b;pointer-events:none;z-index:2}.guide span{position:absolute;top:7px;left:4px;padding:2px 3px;background:#101010cc;color:#ff6b6b;font-size:9px;white-space:nowrap}
+.controls-toggle{display:flex;min-width:0;align-items:center;justify-content:space-between;width:100%;height:44px;padding:0 16px;border:0;border-top:1px solid var(--section);border-bottom:1px solid var(--section);background:#f5f5f3;color:#333;font:inherit;font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+.panel{min-width:0;min-height:0;width:100%;background:#f5f5f3}.panel-scroll{height:100%;max-width:100%;overflow-x:hidden;overflow-y:scroll;scrollbar-gutter:stable;scrollbar-width:thin;scrollbar-color:#b7b7b2 #ecece8;padding:0 14px 12px 16px}.panel-scroll::-webkit-scrollbar{width:6px}.panel-scroll::-webkit-scrollbar-track{background:#ecece8;border-left:1px solid var(--section)}.panel-scroll::-webkit-scrollbar-thumb{background:#b7b7b2;border-radius:0}
+.section{border-top:1px solid var(--section);padding:0 0 8px}.section + .section{margin-top:var(--section-gap)}.section-head{position:sticky;top:0;z-index:4;display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:5px;padding:10px 0 8px;background:#f5f5f3;box-shadow:0 1px 0 var(--section)}.section-head h2{margin:0;font-size:10px;line-height:1.2;letter-spacing:.12em;font-weight:500;text-transform:uppercase;color:var(--label)}.section-head span{font-size:8px;line-height:1.2;letter-spacing:.06em;text-transform:uppercase;color:var(--label);text-align:right;white-space:nowrap}
+.ctl + .ctl{margin-top:5px}.ctl-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:11px;line-height:1.1}.ctl-head output{font-variant-numeric:tabular-nums;color:#555}.slider{position:relative;height:1px;margin:8px 0 3px;background:#b9b9b4}.slider i{position:absolute;top:-3px;width:7px;height:7px;margin-left:-3px;background:#555;border-radius:1px}
+.add-zone{min-height:44px;padding:10px 14px;border:1px solid var(--hair);border-radius:4px;background:transparent;font:inherit;font-size:11px}.button-row{display:flex;flex-wrap:wrap;gap:8px}.segmented{display:flex;flex-wrap:nowrap;gap:0}.segmented button{flex:1;min-width:0;min-height:30px;padding:5px 4px;border:1px solid var(--hair);border-radius:0;background:transparent;font:inherit;font-size:9px;white-space:nowrap}.segmented button:first-child{border-radius:4px 0 0 4px}.segmented button:last-child{border-radius:0 4px 4px 0}.segmented button + button{border-left:0}.segmented button.active{background:#252525;border-color:#252525;color:#fff}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="header">
+    <div class="header-left"><h1 class="brand">thr4ce</h1><button class="icon-btn" disabled aria-label="Undo">↶</button><button class="icon-btn" disabled aria-label="Redo">↷</button></div>
+    <div class="header-actions"><button class="button">Import</button></div>
+  </header>
+
+  <main class="viewer" aria-label="Viewer layout preview">
+    <div class="preview-card"><span>image preview</span></div>
+    <div class="overlay viewer-top"><div class="chrome"><button>photo</button><span class="divider"></span><button class="active">stencil</button></div><button class="polarity" aria-label="Toggle polarity">◐</button></div>
+    <div class="overlay viewer-tools"><div class="chrome"><button class="active">Brush</button><button>Hand</button><button>Select</button></div><button class="compare">Compare</button></div>
+    <div class="overlay viewer-zoom chrome"><button>−</button><span class="zoom-readout">250%</span><button>Fit</button><button>+</button></div>
+    <div class="guide"><span>58 mm</span></div>
+  </main>
+
+  <button class="controls-toggle"><span>controls</span><span>▾</span></button>
+
+  <aside class="panel" aria-label="Control panel drawer">
+    <div class="panel-scroll">
+      <section class="section" data-section="IMAGE"><div class="section-head"><h2>Image</h2><span>BILD.JPG · 2400 × 1702</span></div><button class="add-zone">Import image</button></section>
+      <section class="section" data-section="TONE">
+        <div class="section-head"><h2>Tone</h2><span>Before the mask</span></div>
+        <div class="ctl"><div class="ctl-head"><span>brightness</span><output>0</output></div><div class="slider"><i style="left:50%"></i></div></div>
+        <div class="ctl"><div class="ctl-head"><span>contrast</span><output>0</output></div><div class="slider"><i style="left:50%"></i></div></div>
+        <div class="ctl"><div class="ctl-head"><span>black point</span><output>0</output></div><div class="slider"><i style="left:2%"></i></div></div>
+        <div class="ctl"><div class="ctl-head"><span>white point</span><output>100</output></div><div class="slider"><i style="left:98%"></i></div></div>
+        <div class="ctl"><div class="ctl-head"><span>pre-blur</span><output>0 px</output></div><div class="slider"><i style="left:2%"></i></div></div>
+      </section>
+      <section class="section" data-section="THRESHOLD"><div class="section-head"><h2>Threshold</h2><span>Auto · Otsu</span></div><div class="ctl"><div class="ctl-head"><span>threshold</span><output>off</output></div><div class="slider"><i style="left:0"></i></div></div><div class="button-row" style="margin-top:8px"><button class="add-zone">auto threshold</button></div></section>
+      <section class="section" data-section="DITHER"><div class="section-head"><h2>Dither</h2><span>Replaces threshold</span></div><div class="segmented"><button>none</button><button>floyd</button><button>jarvis</button><button>bayer</button><button class="active">round</button></div></section>
+      <section class="section" data-section="ZONES"><div class="section-head"><h2>Zones</h2><span>Overrides dither inside</span></div></section>
+      <section class="section" data-section="BRUSH"><div class="section-head"><h2>Brush</h2><span>Break with intention</span></div></section>
+      <section class="section" data-section="TRANSFORM"><div class="section-head"><h2>Transform</h2><span>Nothing removed</span></div></section>
+      <section class="section" data-section="PRINT"><div class="section-head"><h2>Print</h2><span>203 dpi · 58 mm</span></div><button class="add-zone" style="width:100%">Export…</button></section>
+    </div>
+  </aside>
+
+  <footer class="status" style="grid-row:5;display:flex;align-items:center;padding:0 16px;border-top:1px solid var(--section);background:#f5f5f3e8;color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums">thresh 45 · round-dot · dot 6 · 41% ink · 250%</footer>
+</div>
+<script>document.querySelector('.panel-scroll').scrollTop = 1;</script>
+</body>
+</html>
