@@ -92,6 +92,8 @@ Select a rectangle on the canvas, then choose **Add zone**. Painted regions stor
 
 Zones come in two shapes: **rect** (drag a selection, then **Add zone**) and **paint** (switch the Zones shape control to paint, then drag on the canvas with the brush). A painted region is a freeform band that follows the path, so a halftone can follow an arm instead of a rectangle. Coverage is a selection, not an alpha ramp: the mask stays strictly 1-bit, so the painted boundary is hard with no feathered edge.
 
+While you drag, the canvas shows the region you are painting as a flat tint; the zone is dithered once when you release the pointer, so a drag stays responsive. On release the status reads the painted area, for example `zone 1 painted · 81 584 px` — the coverage, not the bounding box.
+
 Zones override only the dithering treatment, not tone, Levels, pre-blur, or mirroring. Error diffusion runs inside each zone rectangle, so its error cannot spill outside. Bayer and round-dot patterns restart at the zone’s top-left corner. Zone edges can therefore show seams; that is intentional and visible.
 
 Up to eight zones are supported. Use the zone chip’s `×` to remove it. A zone must be at least 8 × 8 pixels. Add and remove actions are each one undo step.
@@ -121,6 +123,8 @@ The **Download .stencil.json** control remains available below the export button
 ## Known limitations
 
 Pre-blur uses the browser's canvas filter (`blur()`), which may be unavailable or partial on some browsers; a pixel-space replacement measured 424–663 ms at 2880 × 1800, roughly four times the redraw budget, so it was deliberately left on the native filter.
+
+Painted zones are a newer part of the project format. A build that predates them accepts the file but shows each painted zone as its bounding rectangle; the app it runs in cannot warn about it, because the warning would have to exist in that older build. This build does warn when a painted region in a loaded project cannot be restored and falls back to its rectangle: `painted zones are shown as rectangles in this build`.
 
 ## Philosophy
 

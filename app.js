@@ -3,6 +3,8 @@ const $ = id => document.getElementById(id);
 const canvas = $('canvas');
 const ctx = canvas.getContext('2d', {willReadFrequently: true});
 const viewer = $('viewer');
+const paintTint = $('paint-tint');
+const paintTintCtx = paintTint.getContext('2d');
 const stage = $('canvas-stage');
 const zoomLabel = $('zoom-label');
 const brushRing = $('brush-ring');
@@ -542,9 +544,50 @@ function buildZoneCoverage(zone) {
       if (value > coverage[i]) coverage[i] = value;
     }
   }
-  zone._coverage = {signature, mask: coverage, bbox};
+  let area = 0;
+  for (let i = 0; i < coverage.length; i++) if (coverage[i] >= 128) area++;
+  zone._coverage = {signature, mask: coverage, bbox, area};
   return zone._coverage;
 }
+
+// While a zone region is being painted the canvas only gets a flat tint of the
+// in-progress coverage. No dithering runs during the drag; the composite happens
+// once on pointerup, so a drag never pays for a re-quantised zone per segment.
+function paintZoneTint() {
+  const session = state.paintSession;
+  if (!session) return;
+  if (!session.zone) session.zone = {region: {type: 'paint', strokes: [{radius: session.radius, segments: session.segments}]}};
+  session.zone.region.strokes[0].segments = session.segments;
+  const coverage = buildZoneCoverage(session.zone);
+  if (!coverage) { clearZoneTint(); return; }
+  if (paintTint.width !== canvas.width || paintTint.height !== canvas.height) {
+    paintTint.width = canvas.width;
+    paintTint.height = canvas.height;
+    session.tintBox = null;
+  }
+  if (session.tintBox) paintTintCtx.clearRect(session.tintBox.x, session.tintBox.y, session.tintBox.w, session.tintBox.h);
+  const {bbox} = coverage, bw = bbox.x1 - bbox.x0, bh = bbox.y1 - bbox.y0;
+  const image = paintTintCtx.createImageData(bw, bh);
+  const data = image.data;
+  for (let i = 0; i < coverage.mask.length; i++) {
+    if (coverage.mask[i] < 128) continue;
+    const p = i * 4;
+    data[p] = 255;
+    data[p + 1] = 75;
+    data[p + 2] = 75;
+    data[p + 3] = 96;
+  }
+  paintTintCtx.putImageData(image, bbox.x0, bbox.y0);
+  session.tintBox = {x: bbox.x0, y: bbox.y0, w: bw, h: bh};
+  paintTint.hidden = false;
+}
+
+function clearZoneTint() {
+  if (paintTint.width && paintTint.height) paintTintCtx.clearRect(0, 0, paintTint.width, paintTint.height);
+  paintTint.hidden = true;
+}
+
+const groupDigits = value => String(value).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 
 // Bayer and round-dot restart at each zone's top-left corner. Error diffusion
 // runs on the zone crop only, so no quantisation error can cross its rectangle.
@@ -1007,6 +1050,7 @@ function removeZone(index) {
 function setZoneShape(shape) {
   if (shape !== 'rect' && shape !== 'paint') return;
   if (state.paintSession) {
+    clearZoneTint();
     state.paintSession = null;
     viewer.classList.remove('is-drawing');
   }
@@ -1027,6 +1071,7 @@ function beginZonePaint(event) {
   state.paintSession = {pointerId: event.pointerId, radius: state.brushSize, segments: [{x: point.x, y: point.y}]};
   state.gesture = true;
   viewer.classList.add('is-drawing');
+  paintZoneTint();
   status('Painting zone region…');
   return true;
 }
@@ -1039,11 +1084,13 @@ function appendZonePaint(event) {
   const last = session.segments[session.segments.length - 1];
   if (Math.hypot(point.x - last.x, point.y - last.y) < Math.max(1, session.radius * .18)) return;
   session.segments.push(point);
+  paintZoneTint();
 }
 
 function finishZonePaint(commit) {
   const session = state.paintSession;
   if (!session) return;
+  clearZoneTint();
   state.paintSession = null;
   state.gesture = false;
   viewer.classList.remove('is-drawing');
@@ -1071,7 +1118,8 @@ function finishZonePaint(commit) {
   invalidateBase();
   syncControls();
   render();
-  status(`zone ${state.zones.length} painted · ${bbox.width} × ${bbox.height} px.`);
+  const coverage = buildZoneCoverage(state.zones[state.zones.length - 1]);
+  status(coverage ? `zone ${state.zones.length} painted · ${groupDigits(coverage.area)} px.` : `zone ${state.zones.length} painted · ${bbox.width} × ${bbox.height} px bbox.`);
 }
 
 function beginSelection(event) {
@@ -2151,6 +2199,8 @@ function applyProject(project) {
   const levels = settings.levels || {};
   const strokes = normalizeProjectStrokes(project.strokes);
   const zones = normalizeProjectZones(project.zones);
+  const paintedInFile = Array.isArray(project.zones) ? project.zones.filter(zone => zone && zone.region && zone.region.type === 'paint').length : 0;
+  const paintedLoaded = zones.filter(zone => zone.region && zone.region.type === 'paint').length;
   const method = DITHER_METHODS.has(settings.method) ? settings.method : 'none';
   const brushMode = BRUSH_MODES.has(brush.mode) ? brush.mode : 'break';
   const printUnit = UNIT_MM[print.unit] ? print.unit : 'mm';
@@ -2212,7 +2262,8 @@ function applyProject(project) {
   render();
   updateSelectionOverlay();
   updateHistory();
-  status(`project applied · ${strokes.length} treatments · ${zones.length} ${zones.length === 1 ? 'zone' : 'zones'}`);
+  const degraded = paintedLoaded < paintedInFile ? ' · painted zones are shown as rectangles in this build' : '';
+  status(`project applied · ${strokes.length} treatments · ${zones.length} ${zones.length === 1 ? 'zone' : 'zones'}${degraded}`);
 }
 
 async function openProjectFile(file) {
