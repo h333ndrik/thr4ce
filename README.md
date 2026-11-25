@@ -92,11 +92,15 @@ Select a rectangle on the canvas, then choose **Add zone**. Painted regions stor
 
 Zones come in two shapes: **rect** (drag a selection, then **Add zone**) and **paint** (switch the Zones shape control to paint, then drag on the canvas with the brush). A painted region is a freeform band that follows the path, so a halftone can follow an arm instead of a rectangle. Coverage is a selection, not an alpha ramp: the mask stays strictly 1-bit, so the painted boundary is hard with no feathered edge.
 
-While you drag, the canvas shows the region you are painting as a flat tint; the zone is dithered once when you release the pointer, so a drag stays responsive. That blue tint is a placement aid only — it is never part of the mask, the project, or the export, and the red 58 mm roll guide steps aside while you paint. On release the status reads the painted area, for example `zone 1 painted · 81 584 px` — the coverage, not the bounding box.
+While you drag, the canvas shows the region you are painting as a flat tint; the zone is dithered once when you release the pointer, so a drag stays responsive. The brush ring shows the band that will actually be painted: a radius-R stroke paints a band R pixels wide, because the coverage cut falls at R/2 on each side of the path. That blue tint is a placement aid only — it is never part of the mask, the project, or the export, and the red 58 mm roll guide steps aside while you paint. On release the status reads the painted area, for example `zone 1 painted · 81 584 px` — the coverage, not the bounding box.
 
 Zones override only the dithering treatment, not tone, Levels, pre-blur, or mirroring. Error diffusion runs inside each zone rectangle, so its error cannot spill outside. Bayer and round-dot patterns restart at the zone’s top-left corner. Zone edges can therefore show seams; that is intentional and visible.
 
-Up to eight zones are supported. Use the zone chip’s `×` to remove it. A zone must be at least 8 × 8 pixels. Add and remove actions are each one undo step.
+A painted zone can grow: **+ stroke** on its chip arms the canvas, and the next drag appends a stroke to that zone with the current brush radius instead of creating a new one. The zone keeps the dither settings it was created with. The button is disabled for rect zones, whose region is a rectangle. Each drag is one undo step; Escape or a shape switch discards the stroke in progress.
+
+Cover a wide area with several strokes rather than one huge radius: zone coverage is rebuilt from the stroke path every time it changes, and that cost grows with the area it covers, while a few radius-64 strokes cost milliseconds each.
+
+Up to eight zones are supported. Use the zone chip’s `×` to remove it. A zone must be at least 8 × 8 pixels. Add, extend and remove actions are each one undo step.
 
 ## Project Files (.thr4ce)
 

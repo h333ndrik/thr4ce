@@ -84,7 +84,7 @@ const PRESETS = {
   riso: {label: 'riso', brightness: -4, contrast: 25, method: 'jarvis', dotPx: 1, intensity: 65},
   decay: {label: 'decay', brightness: -8, contrast: 35, method: 'floyd-steinberg', dotPx: 1, intensity: 80}
 };
-const state = {...DEFAULTS, img: null, name: '', history: [], future: [], gesture: false, comparing: false, raf: 0, zoom: 1, panX: 0, panY: 0, zoomMode: 'fit', activeTool: 'brush', spaceDown: false, renderMs: 0, renderMode: 'rgb', inkPercent: 0, strokes: [], zones: [], currentStroke: null, strokeBefore: null, strokePointerId: null, printWidth: 100, printHeight: 75, printUnit: 'mm', dpiPreset: '203', customDpi: 300, rotate90: false, sourceHash: null, selection: null, selectSession: null, previewPhoto: false, zoneShape: 'rect', paintSession: null};
+const state = {...DEFAULTS, img: null, name: '', history: [], future: [], gesture: false, comparing: false, raf: 0, zoom: 1, panX: 0, panY: 0, zoomMode: 'fit', activeTool: 'brush', spaceDown: false, renderMs: 0, renderMode: 'rgb', inkPercent: 0, strokes: [], zones: [], currentStroke: null, strokeBefore: null, strokePointerId: null, printWidth: 100, printHeight: 75, printUnit: 'mm', dpiPreset: '203', customDpi: 300, rotate90: false, sourceHash: null, selection: null, selectSession: null, previewPhoto: false, zoneShape: 'rect', paintSession: null, appendZoneIndex: null};
 let importSequence = 0;
 let pendingEvidence = null;
 let baseMask = null;
@@ -266,6 +266,7 @@ async function importImage(file, source = 'input') {
       strokePointerId: null,
       selection: null,
       selectSession: null,
+      appendZoneIndex: null,
       previewPhoto: false
     });
     invalidateBase();
@@ -602,8 +603,11 @@ function buildZoneCoverage(zone) {
 function paintZoneTint() {
   const session = state.paintSession;
   if (!session) return;
-  if (!session.zone) session.zone = {region: {type: 'paint', strokes: [{radius: session.radius, segments: session.segments}]}};
-  session.zone.region.strokes[0].segments = session.segments;
+  const stroke = {radius: session.radius, segments: session.segments};
+  const target = session.appendIndex === null ? null : state.zones[session.appendIndex];
+  const base = target && target.region ? target.region.strokes : [];
+  if (!session.zone) session.zone = {region: {type: 'paint', strokes: []}};
+  session.zone.region.strokes = [...base, stroke];
   const coverage = buildZoneCoverage(session.zone);
   if (!coverage) { clearZoneTint(); return; }
   if (paintTint.width !== canvas.width || paintTint.height !== canvas.height) {
@@ -969,6 +973,7 @@ showStage('image');
 function selectTool(tool) {
   if (!['brush', 'hand', 'select'].includes(tool)) return;
   if (tool !== 'select' && state.activeTool === 'select') clearSelection(false);
+  if (tool !== 'brush' && state.appendZoneIndex !== null) { state.appendZoneIndex = null; renderZones(); }
   state.activeTool = tool;
   $('brush-tool').setAttribute('aria-pressed', String(tool === 'brush'));
   $('hand-tool').setAttribute('aria-pressed', String(tool === 'hand'));
@@ -1002,6 +1007,9 @@ function renderZones() {
   if (!list) return;
   list.replaceChildren();
   state.zones.forEach((zone, index) => {
+    const item = document.createElement('div');
+    item.className = 'zone-item';
+    if (state.appendZoneIndex === index) item.classList.add('is-armed');
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'zone-chip';
@@ -1009,7 +1017,16 @@ function renderZones() {
     button.title = `Remove zone ${index + 1}`;
     button.setAttribute('aria-label', `Remove zone ${index + 1}`);
     button.textContent = `zone ${index + 1} · ${ZONE_METHOD_LABELS[zone.method] || 'none'} · ×`;
-    list.append(button);
+    const add = document.createElement('button');
+    add.type = 'button';
+    add.className = 'zone-add';
+    add.dataset.appendZone = String(index);
+    add.textContent = '+ stroke';
+    const painted = Boolean(zone.region && zone.region.type === 'paint');
+    add.disabled = !painted;
+    add.title = painted ? `Add another stroke to zone ${index + 1}` : 'This zone is a rectangle; only painted zones can take another stroke.';
+    item.append(button, add);
+    list.append(item);
   });
   const empty = $('zone-empty');
   if (empty) empty.hidden = state.zones.length > 0;
@@ -1086,6 +1103,7 @@ function addZoneFromSelection() {
 
 function removeZone(index) {
   if (!Number.isInteger(index) || !state.zones[index]) return;
+  state.appendZoneIndex = null;
   pushHistory();
   state.zones.splice(index, 1);
   invalidateBase();
@@ -1102,6 +1120,7 @@ function setZoneShape(shape) {
     updateRollGuide();
     viewer.classList.remove('is-drawing');
   }
+  state.appendZoneIndex = null;
   state.zoneShape = shape;
   const rectButton = $('zone-shape-rect'), paintButton = $('zone-shape-paint');
   rectButton.classList.toggle('on', shape === 'rect');
@@ -1113,16 +1132,35 @@ function setZoneShape(shape) {
 $('zone-shape-rect').onclick = () => setZoneShape('rect');
 $('zone-shape-paint').onclick = () => setZoneShape('paint');
 
+function armZoneAppend(index) {
+  const zone = state.zones[index];
+  if (!zone || !zone.region || zone.region.type !== 'paint') return;
+  if (state.paintSession) finishZonePaint(false);
+  state.appendZoneIndex = index;
+  if (state.activeTool !== 'brush') selectTool('brush');
+  renderZones();
+  status(`Adding a stroke to zone ${index + 1}: drag on the canvas. Escape cancels.`);
+}
+
 function beginZonePaint(event) {
   const point = canvasPoint(event);
   if (!point) return false;
-  state.paintSession = {pointerId: event.pointerId, radius: state.brushSize, segments: [{x: point.x, y: point.y}]};
+  const appendIndex = state.appendZoneIndex;
+  const appendTarget = appendIndex === null ? null : state.zones[appendIndex];
+  const append = Boolean(appendTarget && appendTarget.region && appendTarget.region.type === 'paint');
+  if (!append) state.appendZoneIndex = null;
+  state.paintSession = {
+    pointerId: event.pointerId,
+    radius: state.brushSize,
+    segments: [{x: point.x, y: point.y}],
+    appendIndex: append ? appendIndex : null
+  };
   state.gesture = true;
   viewer.classList.add('is-drawing');
   retryTintPaint();
   updateRollGuide();
   paintZoneTint();
-  status('Painting zone region…');
+  status(append ? `Adding a stroke to zone ${appendIndex + 1}…` : 'Painting zone region…');
   return true;
 }
 
@@ -1145,7 +1183,11 @@ function finishZonePaint(commit) {
   updateRollGuide();
   state.gesture = false;
   viewer.classList.remove('is-drawing');
+  const appendIndex = session.appendIndex;
+  state.appendZoneIndex = null;
+  renderZones();
   if (!commit || !session.segments.length) return;
+  if (appendIndex !== null) { commitZoneAppend(appendIndex, session); return; }
   if (state.zones.length >= MAX_ZONES) {
     status(`Zone limit reached (${MAX_ZONES}). Remove a zone first.`);
     return;
@@ -1171,6 +1213,35 @@ function finishZonePaint(commit) {
   render();
   const coverage = buildZoneCoverage(state.zones[state.zones.length - 1]);
   status(coverage ? `zone ${state.zones.length} painted · ${groupDigits(coverage.area)} px.` : `zone ${state.zones.length} painted · ${bbox.width} × ${bbox.height} px bbox.`);
+}
+
+// Appending never creates a zone and never touches the zone's snapshotted
+// dither settings; it only adds a stroke and grows the stored bbox.
+function commitZoneAppend(index, session) {
+  const zone = state.zones[index];
+  if (!zone || !zone.region || zone.region.type !== 'paint') {
+    status('This zone no longer exists.');
+    return;
+  }
+  const stroke = {radius: session.radius, segments: session.segments.map(point => ({x: point.x, y: point.y}))};
+  const strokes = [...zone.region.strokes, stroke];
+  const bbox = zoneStrokesBBox(strokes, canvas.width, canvas.height);
+  if (!bbox || bbox.width < 8 || bbox.height < 8) {
+    status('Painted stroke is too small.');
+    return;
+  }
+  pushHistory();
+  zone.region.strokes.push(stroke);
+  zone.rect = {x: bbox.x0, y: bbox.y0, width: bbox.width, height: bbox.height};
+  delete zone._coverage;
+  invalidateBase();
+  syncControls();
+  render();
+  renderZones();
+  const coverage = buildZoneCoverage(zone);
+  status(coverage
+    ? `zone ${index + 1} extended · ${zone.region.strokes.length} strokes · ${groupDigits(coverage.area)} px.`
+    : `zone ${index + 1} extended · ${zone.region.strokes.length} strokes.`);
 }
 
 function beginSelection(event) {
@@ -1291,6 +1362,7 @@ async function cropSelection() {
       strokePointerId: null,
       selection: null,
       selectSession: null,
+      appendZoneIndex: null,
       previewPhoto: false
     });
     invalidateBase();
@@ -1335,6 +1407,8 @@ const selectButton = $('select-tool');
 if (selectButton) selectButton.onclick = () => selectTool('select');
 $('add-zone').onclick = addZoneFromSelection;
 $('zone-list').addEventListener('click', event => {
+  const append = event.target.closest('[data-append-zone]');
+  if (append) { armZoneAppend(Number(append.dataset.appendZone)); return; }
   const button = event.target.closest('[data-zone-index]');
   if (!button) return;
   removeZone(Number(button.dataset.zoneIndex));
@@ -1389,7 +1463,7 @@ viewer.addEventListener('pointerdown', event => {
   if (pointers.size === 2) beginPinch();
   else if (state.activeTool === 'hand' || state.spaceDown || event.button === 1) beginPan(event.pointerId, event.clientX, event.clientY);
   else if (state.activeTool === 'brush' && event.button === 0) {
-    if (state.zoneShape === 'paint') beginZonePaint(event);
+    if (state.zoneShape === 'paint' || state.appendZoneIndex !== null) beginZonePaint(event);
     else beginBrushStroke(event);
   }
   else if (state.activeTool === 'select' && event.button === 0) {
@@ -1783,7 +1857,7 @@ function updateBrushRing(event) {
     return;
   }
   const viewerRect = viewer.getBoundingClientRect();
-  const diameter = Math.max(2, state.brushSize * 2 * state.zoom);
+  const diameter = Math.max(2, state.brushSize * state.zoom);
   brushRing.hidden = false;
   brushRing.style.width = `${diameter}px`;
   brushRing.style.height = `${diameter}px`;
@@ -2089,6 +2163,13 @@ window.addEventListener('keydown', event => {
     status('Painted region discarded.');
     return;
   }
+  if (event.key === 'Escape' && state.appendZoneIndex !== null) {
+    event.preventDefault();
+    state.appendZoneIndex = null;
+    renderZones();
+    status('Zone append cancelled.');
+    return;
+  }
   if (event.key === 'Escape' && state.selection) {
     event.preventDefault();
     clearSelection();
@@ -2305,7 +2386,8 @@ function applyProject(project) {
     strokeBefore: null,
     strokePointerId: null,
     selection: null,
-    selectSession: null
+    selectSession: null,
+    appendZoneIndex: null
   });
   state.dotMm = quantizeDotMm(state.dotMm); // a saved mm value may come from a different dpi grid
   invalidateBase();
