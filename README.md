@@ -16,14 +16,14 @@ Import a photo or flash artwork. Choose a threshold or dithering treatment to ma
 
 ## Features
 
-### 1 · Import
+### Image tab
 
 - Import PNG, JPG, and WebP artwork through the file picker or drag and drop.
 - Reject unsupported, unreadable, or oversized files without changing the active edit.
 - Replace the working image at any time; originals are never modified.
 - Show the complete image at fit-to-view with a margin on import, even when the fitted scale is below the normal 25% zoom floor.
 
-### 2 · Make stencil
+### Dither tab
 
 - Toggle the viewer between PHOTO and STENCIL · 1-BIT without changing settings.
 - Adjust brightness, contrast, and the black-and-white threshold.
@@ -36,7 +36,7 @@ Import a photo or flash artwork. Choose a threshold or dithering treatment to ma
 - Read neutral ink coverage after every rebuilt mask.
 - Select a rectangle and add up to eight zones with independent dithering or threshold settings.
 
-### 3 · Refine & export
+### Print tab
 
 - Refine the persistent 1-bit mask with Break, Thin, Fatten, Dissolve, and Restore brush modes.
 - Replay every stroke deterministically from its recorded seed, radius, strength, and path.
@@ -46,7 +46,8 @@ Import a photo or flash artwork. Choose a threshold or dithering treatment to ma
 - Mirror artwork for stencil transfer.
 - Zoom from 25–800% after import, fit to view, and pan with Hand, Space-drag, or touch.
 - Pinch to zoom and double-click or double-tap to fit.
-- Keep the full-size viewer pinned near the top of the viewport while the Tone, Dithering, Brush, and Transform controls scroll beneath it.
+- The viewer fills the left column at full height; the controls panel scrolls on its own.
+- The brush dock sits below the viewer in every tab: mode, radius, strength, ghost overlay, despeckle.
 - Undo and redo up to 50 edits.
 - Define print width and height in millimetres, centimetres, or inches.
 - Print at 203 dpi for thermal output, 300 dpi, 600 dpi, or a custom resolution.

@@ -626,6 +626,18 @@ function syncStageFlow() {
   }
 }
 
+function showStage(name) {
+  const stages = {image: stagePhoto, dither: stageStencil, print: stageRefine};
+  for (const [key, element] of Object.entries(stages)) element.hidden = key !== name;
+  for (const tab of document.querySelectorAll('.tabs [data-stage]')) {
+    const on = tab.dataset.stage === name;
+    tab.classList.toggle('on', on);
+    tab.setAttribute('aria-selected', String(on));
+  }
+}
+for (const tab of document.querySelectorAll('.tabs [data-stage]')) tab.onclick = () => showStage(tab.dataset.stage);
+showStage('image');
+
 function selectTool(tool) {
   if (!['brush', 'hand', 'select'].includes(tool)) return;
   if (tool !== 'select' && state.activeTool === 'select') clearSelection(false);

@@ -20,7 +20,7 @@
 <script defer src="app.js"></script>
 </head>
 <body>
-<main>
+<div class="app">
 <header>
   <div><h1>thr4ce</h1></div>
   <details class="project-menu" id="project-menu">
@@ -37,16 +37,8 @@
   </details>
 </header>
 
-<section class="step step-photo" id="stage-photo" aria-labelledby="stage-photo-title">
-  <h2 id="stage-photo-title">1 · Import</h2>
-  <div class="photo-body">
-    <p class="photo-hint">Drop or choose an image.<small>PNG, JPG, or WebP up to 30 MB.</small></p>
-    <label class="button" id="import-label"><span id="import-label-text">+ Import image</span>
-      <input id="file" type="file" accept="image/png,image/jpeg,image/webp">
-    </label>
-  </div>
-</section>
-
+<main>
+<div class="stage-col">
 <section class="viewer" id="viewer" aria-label="Artwork preview">
   <div id="mode-badge" role="button" tabindex="0" aria-label="Switch between photo and stencil preview" aria-pressed="false" hidden>PHOTO</div>
   <div id="canvas-stage">
@@ -81,13 +73,31 @@
     <span id="image-info" hidden></span>
   </div>
 </div>
+</div>
 
-<section class="controls" aria-label="Staged stencil workflow">
-  <section class="step is-locked" id="stage-stencil">
-    <h2>2 · Make stencil <span class="step-note">— available after import</span></h2>
+<aside class="panel" aria-label="Stencil controls">
+  <div class="tabs" role="tablist" aria-label="Editing steps">
+    <button type="button" role="tab" data-stage="image" aria-selected="true" aria-controls="stage-photo">Image</button>
+    <button type="button" role="tab" data-stage="dither" aria-selected="false" aria-controls="stage-stencil">Dither</button>
+    <button type="button" role="tab" data-stage="print" aria-selected="false" aria-controls="stage-refine">Print</button>
+  </div>
+
+  <div class="steps">
+  <section class="step step-photo" id="stage-photo" role="tabpanel" aria-labelledby="stage-photo-title">
+    <h2 id="stage-photo-title">Image</h2>
+    <div class="photo-body">
+      <p class="photo-hint">Drop or choose an image.<small>PNG, JPG, or WebP up to 30 MB.</small></p>
+      <label class="button" id="import-label"><span id="import-label-text">+ Import image</span>
+        <input id="file" type="file" accept="image/png,image/jpeg,image/webp">
+      </label>
+    </div>
+  </section>
+
+  <section class="step is-locked" id="stage-stencil" role="tabpanel" aria-labelledby="stage-stencil-title" hidden>
+    <h2 id="stage-stencil-title">Dither <span class="step-note">— available after import</span></h2>
     <div class="step-body">
       <div class="control-group">
-        <h3>Presets</h3>
+        <h3>Presets <span>one click</span></h3>
         <div class="preset-actions" role="group" aria-label="Workflow and texture presets">
           <button id="preset-clean-stencil" type="button" data-preset="clean" title="Clean threshold with Otsu tone selection and despeckle" disabled>Clean Stencil</button>
           <button id="preset-newsprint" type="button" data-preset="newsprint" title="Round-dot halftone with dot size 5 and 55% ink intensity" disabled>Newsprint</button>
@@ -100,23 +110,17 @@
       </div>
 
       <div class="control-group">
-        <h3>Tone</h3>
+        <h3>Tone <span>before the mask</span></h3>
         <label for="brightness">Brightness <output id="brightness-value">0</output>
           <input id="brightness" type="range" min="-100" max="100" step="1" value="0" disabled>
         </label>
         <label for="contrast">Contrast <output id="contrast-value">0</output>
           <input id="contrast" type="range" min="-100" max="100" step="1" value="0" disabled>
         </label>
-        <label for="threshold">Threshold <output id="threshold-value">off</output>
-          <input id="threshold" type="range" min="0" max="100" step="1" value="0" disabled>
-        </label>
-        <div class="control-actions">
-          <button id="auto-threshold" type="button" disabled title="Choose a threshold from the tonal histogram">Auto threshold</button>
-        </div>
       </div>
 
       <div class="control-group">
-        <h3>Levels</h3>
+        <h3>Levels <span>black/white remap</span></h3>
         <label for="black-point">Black point <output id="black-point-value">0</output>
           <input id="black-point" type="range" min="0" max="100" step="1" value="0" disabled>
         </label>
@@ -130,7 +134,17 @@
       </div>
 
       <div class="control-group">
-        <h3>Dithering</h3>
+        <h3>Threshold <span>auto · otsu</span></h3>
+        <label for="threshold">Threshold <output id="threshold-value">off</output>
+          <input id="threshold" type="range" min="0" max="100" step="1" value="0" disabled>
+        </label>
+        <div class="control-actions">
+          <button id="auto-threshold" type="button" disabled title="Choose a threshold from the tonal histogram">Auto threshold</button>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <h3>Dithering <span>replaces threshold</span></h3>
         <label for="method">Method
           <select id="method" disabled>
             <option value="none">None — clean threshold</option>
@@ -150,7 +164,7 @@
       </div>
 
       <div class="control-group">
-        <h3>Zones</h3>
+        <h3>Zones <span>inside rectangles</span></h3>
         <div id="zone-list" class="zone-list"></div>
         <p class="hint" id="zone-empty">Select an area, then add a zone.</p>
         <p class="hint">Zones override dithering inside their rectangle. Zone edges can show seams.</p>
@@ -158,34 +172,11 @@
     </div>
   </section>
 
-  <section class="step is-locked" id="stage-refine">
-    <h2>3 · Refine &amp; export <span class="step-note">— available after import</span></h2>
+  <section class="step is-locked" id="stage-refine" role="tabpanel" aria-labelledby="stage-refine-title" hidden>
+    <h2 id="stage-refine-title">Print <span class="step-note">— available after import</span></h2>
     <div class="step-body">
       <div class="control-group">
-        <h3>Brush</h3>
-        <label for="brush-mode">Mode
-          <select id="brush-mode" disabled>
-            <option value="break">Break</option>
-            <option value="thin">Thin</option>
-            <option value="fatten">Fatten</option>
-            <option value="dissolve">Dissolve</option>
-            <option value="restore">Restore</option>
-          </select>
-        </label>
-        <label for="brush-size">Radius <output id="brush-size-value">12</output>
-          <input id="brush-size" type="range" min="2" max="64" step="1" value="12" disabled>
-        </label>
-        <label for="brush-strength">Strength <output id="brush-strength-value">50</output>
-          <input id="brush-strength" type="range" min="0" max="100" step="1" value="50" disabled>
-        </label>
-        <label class="check-row" for="ghost-toggle" title="Shows the original photo faintly under the stencil so you can see where the source lines are."><input id="ghost-toggle" type="checkbox" checked disabled> Ghost overlay</label>
-        <div class="control-actions">
-          <button id="despeckle" type="button" disabled title="Removes isolated ink specks smaller than 4 px (scan-noise cleanup).">Despeckle</button>
-        </div>
-      </div>
-
-      <div class="control-group">
-        <h3>Transform</h3>
+        <h3>Transform <span>export only</span></h3>
         <div class="control-actions">
           <button id="mirror" type="button" aria-pressed="false" disabled title="Flip horizontally for stencil transfer">Mirror</button>
           <button id="reset" type="button" disabled>Reset</button>
@@ -194,7 +185,7 @@
       </div>
 
       <div class="control-group">
-        <h3>Print</h3>
+        <h3>Print <span>203 dpi · 58 mm</span></h3>
         <div class="print-settings">
           <div class="print-fields">
             <label for="print-width">Width <input id="print-width" type="number" min="0.1" step="0.1" value="100" disabled></label>
@@ -235,10 +226,38 @@
       </div>
     </div>
   </section>
-</section>
+  </div>
+</aside>
+</main>
+
+<div class="dock" aria-label="Brush dock">
+  <div class="dock-row dock-row1">
+    <label class="dock-mode" for="brush-mode">Mode
+      <select id="brush-mode" disabled>
+        <option value="break">Break</option>
+        <option value="thin">Thin</option>
+        <option value="fatten">Fatten</option>
+        <option value="dissolve">Dissolve</option>
+        <option value="restore">Restore</option>
+      </select>
+    </label>
+    <div class="dock-checks">
+      <label class="check-row" for="ghost-toggle" title="Shows the original photo faintly under the stencil so you can see where the source lines are."><input id="ghost-toggle" type="checkbox" checked disabled> Ghost overlay</label>
+      <button id="despeckle" type="button" disabled title="Removes isolated ink specks smaller than 4 px (scan-noise cleanup).">Despeckle</button>
+    </div>
+  </div>
+  <div class="dock-row dock-sliders">
+    <label for="brush-size">Radius <output id="brush-size-value">12</output>
+      <input id="brush-size" type="range" min="2" max="64" step="1" value="12" disabled>
+    </label>
+    <label for="brush-strength">Strength <output id="brush-strength-value">50</output>
+      <input id="brush-strength" type="range" min="0" max="100" step="1" value="50" disabled>
+    </label>
+  </div>
+</div>
 
 <div id="status" role="status" aria-live="polite">Ready to import.</div>
-</main>
+</div>
 
 <dialog id="export-dialog" class="export-dialog" aria-labelledby="export-dialog-title">
   <div class="export-dialog-card">

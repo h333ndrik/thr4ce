@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'thr4ce-v16';
+const CACHE_NAME = 'thr4ce-v17';
 const PRECACHE = [
   './',
   'index.html',
