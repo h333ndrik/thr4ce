@@ -548,6 +548,11 @@ function dotPxMm() {
   return 25.4 / printDpi();
 }
 
+function quantizeDotMm(mm) {
+  const pxMm = dotPxMm();
+  return clamp(Math.round(mm / pxMm), 1, 16) * pxMm;
+}
+
 function syncDotSlider() {
   const pxMm = dotPxMm();
   const el = $('dotsize');
@@ -555,7 +560,7 @@ function syncDotSlider() {
   el.max = String(16 * pxMm * (1 + 1e-12));
   el.step = String(pxMm);
   if (Number.isFinite(state.dotsize)) return;
-  state.dotMm = clamp(Math.round(state.dotMm / pxMm), 1, 16) * pxMm;
+  state.dotMm = quantizeDotMm(state.dotMm);
   el.value = String(state.dotMm);
 }
 
@@ -563,6 +568,7 @@ function updateDotReadout() {
   syncDotSlider();
   const legacy = Number.isFinite(state.dotsize);
   const dotMm = dotMillimetres();
+  if (legacy) $('dotsize').value = String(quantizeDotMm(dotMm));
   $('dotsize-value').textContent = legacy
     ? `legacy ${dotMm.toFixed(2)} mm · ${dotPrintPixels()} px`
     : `${dotMm.toFixed(2)} mm · ${dotPrintPixels()} px @ ${printDpi()} dpi`;
@@ -1473,7 +1479,7 @@ function randomize(seed = seedHex()) {
   state.previewPhoto = false;
   const {dotPx, ...settings} = randomizedSettings(seed);
   Object.assign(state, settings, {randomSeed: seed});
-  state.dotMm = dotPx * dotPxMm();
+  state.dotMm = quantizeDotMm(dotPx * dotPxMm());
   state.dotsize = null;
   for (const zone of state.zones) zone.dotsize = null;
   invalidateBase();
@@ -1490,7 +1496,7 @@ function applyPreset(id) {
   const {label, threshold, dotPx, ...settings} = preset;
   Object.assign(state, settings);
   if (typeof dotPx === 'number') {
-    state.dotMm = clamp(dotPx, 1, 16) * dotPxMm();
+    state.dotMm = quantizeDotMm(clamp(dotPx, 1, 16) * dotPxMm());
     state.dotsize = null;
     for (const zone of state.zones) zone.dotsize = null;
   }
@@ -1586,8 +1592,7 @@ for (const id of ['brightness', 'contrast', 'threshold', 'intensity']) {
 $('dotsize').addEventListener('input', () => {
   if (!state.gesture) { pushHistory(); state.gesture = true; }
   state.previewPhoto = false;
-  const pxMm = dotPxMm();
-  state.dotMm = clamp(Math.round(Number($('dotsize').value) / pxMm), 1, 16) * pxMm;
+  state.dotMm = quantizeDotMm(Number($('dotsize').value));
   state.dotsize = null;
   for (const zone of state.zones) zone.dotsize = null;
   invalidateBase();
@@ -1924,6 +1929,7 @@ function applyProject(project) {
     selection: null,
     selectSession: null
   });
+  state.dotMm = quantizeDotMm(state.dotMm); // a saved mm value may come from a different dpi grid
   invalidateBase();
   syncControls();
   render();

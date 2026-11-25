@@ -64,7 +64,7 @@ Pre-blur softens scan grain before Levels, thresholding, and dithering. It also 
 
 ## Dot size
 
-Dot size is set in millimetres on a grid derived from the print resolution: one stop per print pixel (`25.4 / dpi` mm) from 1 to 16 print pixels, so 16 distinct sizes from 0.13 to 2.00 mm at 203 dpi. The readout shows the print pixels beside the value, for example `0.38 mm · 3 px @ 203 dpi`; every stop changes the dot by exactly one print pixel, and raising the dpi makes the grid finer automatically. Below ~0.3 mm transfer is unreliable. Presets set their dot in print pixels, so a preset prints the same dot on every scan. Projects saved before this change keep their original pixel-based dot sizes and load unchanged; moving the slider or applying a preset switches them to the grid.
+Dot size is set in millimetres on a grid derived from the print resolution: one stop per print pixel (`25.4 / dpi` mm) from 1 to 16 print pixels, so 16 distinct sizes from 0.13 to 2.00 mm at 203 dpi. The readout shows the print pixels beside the value, for example `0.38 mm · 3 px @ 203 dpi`; every stop changes the dot by exactly one print pixel, and raising the dpi makes the grid finer automatically. Below ~0.3 mm transfer is unreliable. Presets set their dot in print pixels, so a preset prints the same dot on every scan. Projects saved before this change keep their original pixel-based dot sizes and load unchanged; touching the slider snaps them to the nearest print pixel and applying a preset switches them to the grid.
 
 ## Presets
 
