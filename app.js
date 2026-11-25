@@ -5,11 +5,52 @@ const ctx = canvas.getContext('2d', {willReadFrequently: true});
 const viewer = $('viewer');
 const paintTint = $('paint-tint');
 const paintTintCtx = paintTint.getContext('2d');
-// The tint colour lives in one place (:root --tint-paint); this only decodes it.
-const tintPaintRgb = (() => {
-  const value = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tint-paint').trim().replace('#', ''), 16);
-  return Number.isFinite(value) ? [(value >> 16) & 255, (value >> 8) & 255, value & 255] : [255, 255, 255];
-})();
+// Last resort only: this must stay in sync with --tint-paint in :root. The CSS
+// value wins whenever it can be read; this mirrors it for the cases where it
+// cannot (stylesheet not applied yet, CSS failed to load).
+const TINT_PAINT_FALLBACK = '#4b7bff';
+const TINT_PAINT_ALPHA = 115;
+
+function parseTintColour(text) {
+  const value = String(text || '').trim().toLowerCase();
+  if (!value) return null;
+  let match = /^#([0-9a-f]{3})$/.exec(value);
+  if (match) return [...match[1]].map(digit => parseInt(digit + digit, 16));
+  match = /^#([0-9a-f]{6})$/.exec(value);
+  if (match) return [0, 2, 4].map(index => parseInt(match[1].slice(index, index + 2), 16));
+  match = /^rgba?\(\s*(\d{1,3})\s*[,\s]\s*(\d{1,3})\s*[,\s]\s*(\d{1,3})/.exec(value);
+  if (match) return match.slice(1, 4).map(channel => Math.min(255, Math.max(0, Number(channel))));
+  return null;
+}
+
+const readTintPaint = () => parseTintColour(getComputedStyle(document.documentElement).getPropertyValue('--tint-paint'));
+
+let tintPaintRgb = readTintPaint();
+let tintPaintFromFallback = false;
+let tintPaintRetried = false;
+let tintPaintWarned = false;
+
+function tintPaintColour() {
+  if (tintPaintRgb) return tintPaintRgb;
+  if (!tintPaintWarned) {
+    tintPaintWarned = true;
+    console.warn(`thr4ce: --tint-paint is empty or unparsable; painting the zone tint with ${TINT_PAINT_FALLBACK}.`);
+  }
+  tintPaintFromFallback = true;
+  tintPaintRgb = parseTintColour(TINT_PAINT_FALLBACK) || [75, 123, 255];
+  return tintPaintRgb;
+}
+
+// One retry on the next pointerdown: WebKit can report the property empty
+// before styles are applied. No polling loop, no second retry.
+function retryTintPaint() {
+  if (tintPaintRetried || (tintPaintRgb && !tintPaintFromFallback)) return;
+  tintPaintRetried = true;
+  const value = readTintPaint();
+  if (!value) return;
+  tintPaintRgb = value;
+  tintPaintFromFallback = false;
+}
 const stage = $('canvas-stage');
 const zoomLabel = $('zoom-label');
 const brushRing = $('brush-ring');
@@ -574,13 +615,14 @@ function paintZoneTint() {
   const {bbox} = coverage, bw = bbox.x1 - bbox.x0, bh = bbox.y1 - bbox.y0;
   const image = paintTintCtx.createImageData(bw, bh);
   const data = image.data;
+  const [red, green, blue] = tintPaintColour();
   for (let i = 0; i < coverage.mask.length; i++) {
     if (coverage.mask[i] < 128) continue;
     const p = i * 4;
-    data[p] = tintPaintRgb[0];
-    data[p + 1] = tintPaintRgb[1];
-    data[p + 2] = tintPaintRgb[2];
-    data[p + 3] = 115;
+    data[p] = red;
+    data[p + 1] = green;
+    data[p + 2] = blue;
+    data[p + 3] = TINT_PAINT_ALPHA;
   }
   paintTintCtx.putImageData(image, bbox.x0, bbox.y0);
   session.tintBox = {x: bbox.x0, y: bbox.y0, w: bw, h: bh};
@@ -1077,6 +1119,7 @@ function beginZonePaint(event) {
   state.paintSession = {pointerId: event.pointerId, radius: state.brushSize, segments: [{x: point.x, y: point.y}]};
   state.gesture = true;
   viewer.classList.add('is-drawing');
+  retryTintPaint();
   updateRollGuide();
   paintZoneTint();
   status('Painting zone region…');
