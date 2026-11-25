@@ -22,11 +22,12 @@ Import a photo or flash artwork. Choose a threshold or dithering treatment to ma
 - Reject unsupported, unreadable, or oversized files without changing the active edit.
 - Replace the working image at any time; originals are never modified.
 - Show the complete image at fit-to-view with a margin on import, even when the fitted scale is below the normal 25% zoom floor.
+- Images above 16.7 MP are prepared as a downscaled working copy; the original file is never modified.
 
 ### Dither tab
 
 - Toggle the viewer between PHOTO and STENCIL · 1-BIT without changing settings.
-- Adjust brightness, contrast, and the black-and-white threshold.
+- Adjust brightness, contrast, and the black-and-white threshold; brightness and contrast are computed in pixel space so they behave identically across browsers.
 - Set black and white points to remap midtones, and apply 0–6 px of pre-blur to soften scan grain.
 - Choose a threshold automatically with Otsu histogram analysis; analysis includes the active Levels and pre-blur.
 - The tone pipeline runs in a fixed order: white base → brightness/contrast → pre-blur → levels → mirror → threshold/dithering.
@@ -114,6 +115,10 @@ thr4ce works with Phomemo, AirPrint, any printer — one perfect file.
 The export dialog can write a `<name>.stencil.json` evidence file alongside the PNG. It records the source dimensions and SHA-256 hash, all tone, dithering, brush, inversion, despeckle, rotation, and print settings, every stroke seed and segment, and the zone list.
 
 The **Download .stencil.json** control remains available below the export button after either download and writes the same evidence file again.
+
+## Known limitations
+
+Pre-blur uses the browser's canvas filter (`blur()`), which may be unavailable or partial on some browsers; a pixel-space replacement measured 424–663 ms at 2880 × 1800, roughly four times the redraw budget, so it was deliberately left on the native filter.
 
 ## Philosophy
 

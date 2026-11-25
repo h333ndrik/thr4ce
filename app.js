@@ -21,6 +21,8 @@ const ghostCanvas = document.createElement('canvas');
 const ghostCtx = ghostCanvas.getContext('2d', {willReadFrequently: true});
 const mirrorCanvas = document.createElement('canvas');
 const mirrorCtx = mirrorCanvas.getContext('2d', {willReadFrequently: true});
+const toneCanvas = document.createElement('canvas');
+const toneCtx = toneCanvas.getContext('2d', {willReadFrequently: true});
 const MIN_ZOOM = .25, MAX_ZOOM = 8, MAX_ZONES = 8, FIT_MIN_ZOOM = .01, ZOOM_STEP = 1.25;
 const UNIT_MM = {mm: 1, cm: 10, inch: 25.4};
 const DEFAULTS = {brightness: 0, contrast: 0, blackPoint: 0, whitePoint: 100, preBlur: 0, threshold: 0, method: 'none', dotsize: null, dotMm: 0.25, intensity: 50, mirrored: false, despeckle: false, brushMode: 'break', brushSize: 12, brushStrength: 50, ghost: true, invert: false, randomSeed: null};
@@ -121,6 +123,7 @@ function apply(s) {
 }
 
 const MAX_IMPORT_BYTES = 30 * 1024 * 1024;
+const MAX_CANVAS_PIXELS = Math.floor(16.7 * 1e6);
 const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 const IMAGE_EXTENSIONS = /\.(png|jpe?g|webp)$/i;
 
@@ -137,6 +140,24 @@ async function sha256Hex(buffer) {
   if (!crypto.subtle) throw new Error('Web Crypto is unavailable');
   const digest = await crypto.subtle.digest('SHA-256', buffer);
   return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+// iOS Safari caps canvas area (~16.7 MP). Only the in-memory working copy is
+// scaled; the imported file stays untouched and its hash still describes it.
+function fitCanvasLimit(image) {
+  const area = image.naturalWidth * image.naturalHeight;
+  if (area <= MAX_CANVAS_PIXELS) return {img: image, scaled: false};
+  const scale = Math.sqrt(MAX_CANVAS_PIXELS / area);
+  const width = Math.max(1, Math.floor(image.naturalWidth * scale));
+  const height = Math.max(1, Math.floor(image.naturalHeight * scale));
+  const scaled = document.createElement('canvas');
+  scaled.width = width;
+  scaled.height = height;
+  const context = scaled.getContext('2d');
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = 'high';
+  context.drawImage(image, 0, 0, width, height);
+  return {img: scaled, scaled: true, width, height, area};
 }
 
 async function importImage(file, source = 'input') {
@@ -165,8 +186,9 @@ async function importImage(file, source = 'input') {
     if (!img.naturalWidth || !img.naturalHeight) throw new Error('empty image');
     const sourceHash = await sha256Hex(buffer);
     if (request !== importSequence) return;
+    const fitted = fitCanvasLimit(img);
     Object.assign(state, DEFAULTS, {
-      img,
+      img: fitted.img,
       name: file.name,
       sourceHash,
       history: [],
@@ -189,7 +211,12 @@ async function importImage(file, source = 'input') {
     syncControls();
     render();
     fitToView();
-    status('Image ready. Adjust, then export for stencil transfer.');
+    if (fitted.scaled) {
+      const mp = (fitted.area / 1e6).toFixed(1);
+      status(`${mp} MP is over the 16.7 MP canvas limit · working copy ${fitted.width} × ${fitted.height} · original file untouched`);
+    } else {
+      status('Image ready. Adjust, then export for stencil transfer.');
+    }
   } catch (error) {
     if (request === importSequence) status('Could not read this image. Nothing changed.');
   } finally {
@@ -313,17 +340,47 @@ function applyLevels(target, blackPoint, whitePoint) {
 }
 
 // Canonical base pipeline:
-// white base -> brightness/contrast (filter) -> blur (filter) -> levels
-// (pixel remap) -> mirror -> threshold/dithering.
+// tone (pixel: brightness then contrast) -> white base + blur (filter) ->
+// levels (pixel remap) -> mirror -> threshold/dithering.
+// Brightness and contrast run in pixel space: canvas ctx.filter is missing or
+// partial on some iOS builds, and a silent no-op there would break the stencil.
+// CSS filter semantics, brightness first, then contrast.
+function applyTone(target, brightness, contrast) {
+  const b = 1 + brightness / 100;
+  const c = 1 + contrast / 100;
+  if (b === 1 && c === 1) return;
+  const image = target.getImageData(0, 0, target.canvas.width, target.canvas.height);
+  const px = image.data;
+  const lut = new Uint8ClampedArray(256);
+  for (let v = 0; v < 256; v++) {
+    const bright = Math.min(255, v * b);
+    lut[v] = Math.min(255, Math.max(0, (bright - 127.5) * c + 127.5));
+  }
+  for (let i = 0; i < px.length; i += 4) {
+    px[i] = lut[px[i]];
+    px[i + 1] = lut[px[i + 1]];
+    px[i + 2] = lut[px[i + 2]];
+  }
+  target.putImageData(image, 0, 0);
+}
+
 function prepareToneCanvas(targetCanvas, targetCtx) {
   const {img} = state;
   targetCanvas.width = img.width;
   targetCanvas.height = img.height;
+  toneCanvas.width = img.width;
+  toneCanvas.height = img.height;
+  toneCtx.setTransform(1, 0, 0, 1, 0, 0);
+  toneCtx.clearRect(0, 0, toneCanvas.width, toneCanvas.height);
+  toneCtx.drawImage(img, 0, 0);
+  applyTone(toneCtx, state.brightness, state.contrast);
   targetCtx.setTransform(1, 0, 0, 1, 0, 0);
   targetCtx.fillStyle = '#fff';
   targetCtx.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
-  targetCtx.filter = `brightness(${1 + state.brightness / 100}) contrast(${1 + state.contrast / 100}) blur(${state.preBlur}px)`;
-  targetCtx.drawImage(img, 0, 0);
+  // pre-blur stays on the browser filter on purpose: a JS three-pass box blur
+  // measured 424-663 ms at 2880x1800, ~4x the budget at 5 MP. Browser-dependent.
+  targetCtx.filter = state.preBlur ? `blur(${state.preBlur}px)` : 'none';
+  targetCtx.drawImage(toneCanvas, 0, 0);
   targetCtx.filter = 'none';
   applyLevels(targetCtx, state.blackPoint, state.whitePoint);
 
