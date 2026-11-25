@@ -96,9 +96,9 @@ While you drag, the canvas shows the region you are painting as a flat tint; the
 
 Zones override only the dithering treatment, not tone, Levels, pre-blur, or mirroring. Error diffusion runs inside each zone rectangle, so its error cannot spill outside. Bayer and round-dot patterns restart at the zone’s top-left corner. Zone edges can therefore show seams; that is intentional and visible.
 
-A painted zone can grow: **+ stroke** on its chip arms the canvas, and the next drag appends a stroke to that zone with the current brush radius instead of creating a new one. The zone keeps the dither settings it was created with. The button is disabled for rect zones, whose region is a rectangle. Each drag is one undo step; Escape or a shape switch discards the stroke in progress.
+A painted zone can grow: **+ stroke** on its chip arms the canvas, and the next drag appends a stroke to that zone with the current brush radius instead of creating a new one. The zone keeps the dither settings it was created with. The button is disabled for rect zones, whose region is a rectangle. Arming stays on across drags until you dismiss it — press Escape, click the same chip again, choose another zone's chip, or switch the shape control or the tool — and each drag is its own undo step.
 
-Cover a wide area with several strokes rather than one huge radius: zone coverage is rebuilt from the stroke path every time it changes, and that cost grows with the area it covers, while a few radius-64 strokes cost milliseconds each.
+Cover a wide area with several strokes rather than one huge radius: a big radius grows a round blob around the path instead of following the form. Strokes are not free either — every append re-renders that zone, and the render scales with the zone's bounding box, so strokes far apart cost more than strokes near each other. Measured at radius 64 on a zone whose box spans the whole 2880 × 1800 source: about 150 ms for the mask composite and about 280 ms from pointer release to a redrawn canvas.
 
 Up to eight zones are supported. Use the zone chip’s `×` to remove it. A zone must be at least 8 × 8 pixels. Add, extend and remove actions are each one undo step.
 

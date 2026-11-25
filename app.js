@@ -502,9 +502,12 @@ function applyTreatmentToMask(operation) {
 }
 
 // Painted zones store only path points. Coverage is rebuilt from the path plus a
-// fixed linear falloff (1 on the centreline, 0 at radius) with a 3-4 chamfer
-// distance field, so it is deterministic and needs no seed; the field also keeps
-// the cost O(bbox) instead of O(segments x bbox).
+// fixed linear falloff, coverage = 255 * (1 - d / radius) clamped to 0..255,
+// where d is the distance to the stroke path. The 3-4 chamfer field below walks
+// axis steps of 3 and diagonal steps of 4, so d is approximated as chamfer / 3;
+// the cut at coverage >= 128 therefore sits at d = 0.5 * radius on each side,
+// which makes a radius-R stroke paint a band R px wide. Deterministic, no seed
+// needed, and the field keeps the cost O(bbox) instead of O(segments x bbox).
 function zoneStrokesBBox(strokes, width, height) {
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const stroke of strokes) {
@@ -1024,6 +1027,7 @@ function renderZones() {
     add.textContent = '+ stroke';
     const painted = Boolean(zone.region && zone.region.type === 'paint');
     add.disabled = !painted;
+    add.setAttribute('aria-pressed', String(state.appendZoneIndex === index));
     add.title = painted ? `Add another stroke to zone ${index + 1}` : 'This zone is a rectangle; only painted zones can take another stroke.';
     item.append(button, add);
     list.append(item);
@@ -1121,6 +1125,7 @@ function setZoneShape(shape) {
     viewer.classList.remove('is-drawing');
   }
   state.appendZoneIndex = null;
+  renderZones();
   state.zoneShape = shape;
   const rectButton = $('zone-shape-rect'), paintButton = $('zone-shape-paint');
   rectButton.classList.toggle('on', shape === 'rect');
@@ -1132,14 +1137,23 @@ function setZoneShape(shape) {
 $('zone-shape-rect').onclick = () => setZoneShape('rect');
 $('zone-shape-paint').onclick = () => setZoneShape('paint');
 
+// Sticky: the zone stays armed across drags until it is dismissed by Escape,
+// a second click on the same chip, another zone's chip, a shape switch or a
+// tool switch. Every drag is still its own undo step.
 function armZoneAppend(index) {
   const zone = state.zones[index];
   if (!zone || !zone.region || zone.region.type !== 'paint') return;
   if (state.paintSession) finishZonePaint(false);
+  if (state.appendZoneIndex === index) {
+    state.appendZoneIndex = null;
+    renderZones();
+    status(`zone ${index + 1} no longer armed.`);
+    return;
+  }
   state.appendZoneIndex = index;
   if (state.activeTool !== 'brush') selectTool('brush');
   renderZones();
-  status(`Adding a stroke to zone ${index + 1}: drag on the canvas. Escape cancels.`);
+  status(`zone ${index + 1} armed · drag to add a stroke.`);
 }
 
 function beginZonePaint(event) {
@@ -1184,7 +1198,7 @@ function finishZonePaint(commit) {
   state.gesture = false;
   viewer.classList.remove('is-drawing');
   const appendIndex = session.appendIndex;
-  state.appendZoneIndex = null;
+  if (appendIndex === null) state.appendZoneIndex = null;
   renderZones();
   if (!commit || !session.segments.length) return;
   if (appendIndex !== null) { commitZoneAppend(appendIndex, session); return; }
@@ -1220,6 +1234,8 @@ function finishZonePaint(commit) {
 function commitZoneAppend(index, session) {
   const zone = state.zones[index];
   if (!zone || !zone.region || zone.region.type !== 'paint') {
+    state.appendZoneIndex = null;
+    renderZones();
     status('This zone no longer exists.');
     return;
   }
@@ -1239,9 +1255,10 @@ function commitZoneAppend(index, session) {
   render();
   renderZones();
   const coverage = buildZoneCoverage(zone);
+  const armedNote = state.appendZoneIndex === index ? ' · armed' : '';
   status(coverage
-    ? `zone ${index + 1} extended · ${zone.region.strokes.length} strokes · ${groupDigits(coverage.area)} px.`
-    : `zone ${index + 1} extended · ${zone.region.strokes.length} strokes.`);
+    ? `zone ${index + 1} extended · ${zone.region.strokes.length} strokes · ${groupDigits(coverage.area)} px${armedNote}.`
+    : `zone ${index + 1} extended · ${zone.region.strokes.length} strokes${armedNote}.`);
 }
 
 function beginSelection(event) {
@@ -2157,17 +2174,12 @@ $('download-evidence').onclick = () => {
 $('undo').onclick = undo;
 $('redo').onclick = redo;
 window.addEventListener('keydown', event => {
-  if (event.key === 'Escape' && state.paintSession) {
+  if (event.key === 'Escape' && (state.paintSession || state.appendZoneIndex !== null)) {
     event.preventDefault();
-    finishZonePaint(false);
-    status('Painted region discarded.');
-    return;
-  }
-  if (event.key === 'Escape' && state.appendZoneIndex !== null) {
-    event.preventDefault();
-    state.appendZoneIndex = null;
-    renderZones();
-    status('Zone append cancelled.');
+    const wasPainting = Boolean(state.paintSession);
+    if (wasPainting) finishZonePaint(false);
+    if (state.appendZoneIndex !== null) { state.appendZoneIndex = null; renderZones(); }
+    status(wasPainting ? 'Painted region discarded.' : 'Zone append cancelled.');
     return;
   }
   if (event.key === 'Escape' && state.selection) {
