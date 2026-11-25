@@ -66,6 +66,10 @@ button:disabled{opacity:.4;cursor:wait}
 .selection-actions{display:flex;gap:4px}
 .selection-actions button{min-height:44px;padding:5px 10px;border-radius:4px}
 .preview-options > button{padding:5px 9px}
+.zone-shape{display:grid;grid-template-columns:repeat(2,1fr);border:1px solid #d2d2ce;border-radius:4px;overflow:hidden}
+.zone-shape button{border:0;border-radius:0;padding:8px 0;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#777;background:transparent}
+.zone-shape button + button{border-left:1px solid #d2d2ce}
+.zone-shape button.on{background:#252525;color:#fff}
 .zone-list{display:flex;flex-wrap:wrap;gap:8px}
 .zone-list:empty{display:none}
 .zone-chip{min-height:44px;padding:8px 12px;font-variant-numeric:tabular-nums}

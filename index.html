@@ -165,7 +165,11 @@
       </div>
 
       <div class="control-group">
-        <h3>Zones <span>inside rectangles</span></h3>
+        <h3>Zones <span>rect or painted</span></h3>
+        <div class="zone-shape" role="group" aria-label="Zone shape">
+          <button id="zone-shape-rect" type="button" class="on" aria-pressed="true" title="Add zones from a rectangle selection">rect</button>
+          <button id="zone-shape-paint" type="button" aria-pressed="false" title="Paint the next zone region with the brush">paint</button>
+        </div>
         <div id="zone-list" class="zone-list"></div>
         <p class="hint" id="zone-empty">Select an area, then add a zone.</p>
         <p class="hint">Zones override dithering inside their rectangle. Zone edges can show seams.</p>

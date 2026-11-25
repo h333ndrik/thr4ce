@@ -88,7 +88,9 @@ Randomize never changes mirroring, strokes, treatments, inversion, rotation, or 
 
 ## Zones
 
-Select a rectangle on the canvas, then choose **Add zone**. The zone snapshots the current dithering method, threshold, dot size, and intensity. Change the global method afterward to combine treatments, for example global Bayer with a round-dot zone.
+Select a rectangle on the canvas, then choose **Add zone**. Painted regions store only their path points in the project file, never a raster. The zone snapshots the current dithering method, threshold, dot size, and intensity. Change the global method afterward to combine treatments, for example global Bayer with a round-dot zone.
+
+Zones come in two shapes: **rect** (drag a selection, then **Add zone**) and **paint** (switch the Zones shape control to paint, then drag on the canvas with the brush). A painted region is a freeform band that follows the path, so a halftone can follow an arm instead of a rectangle. Coverage is a selection, not an alpha ramp: the mask stays strictly 1-bit, so the painted boundary is hard with no feathered edge.
 
 Zones override only the dithering treatment, not tone, Levels, pre-blur, or mirroring. Error diffusion runs inside each zone rectangle, so its error cannot spill outside. Bayer and round-dot patterns restart at the zone’s top-left corner. Zone edges can therefore show seams; that is intentional and visible.
 

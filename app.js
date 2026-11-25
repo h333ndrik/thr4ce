@@ -36,7 +36,7 @@ const PRESETS = {
   riso: {label: 'riso', brightness: -4, contrast: 25, method: 'jarvis', dotPx: 1, intensity: 65},
   decay: {label: 'decay', brightness: -8, contrast: 35, method: 'floyd-steinberg', dotPx: 1, intensity: 80}
 };
-const state = {...DEFAULTS, img: null, name: '', history: [], future: [], gesture: false, comparing: false, raf: 0, zoom: 1, panX: 0, panY: 0, zoomMode: 'fit', activeTool: 'brush', spaceDown: false, renderMs: 0, renderMode: 'rgb', inkPercent: 0, strokes: [], zones: [], currentStroke: null, strokeBefore: null, strokePointerId: null, printWidth: 100, printHeight: 75, printUnit: 'mm', dpiPreset: '203', customDpi: 300, rotate90: false, sourceHash: null, selection: null, selectSession: null, previewPhoto: false};
+const state = {...DEFAULTS, img: null, name: '', history: [], future: [], gesture: false, comparing: false, raf: 0, zoom: 1, panX: 0, panY: 0, zoomMode: 'fit', activeTool: 'brush', spaceDown: false, renderMs: 0, renderMode: 'rgb', inkPercent: 0, strokes: [], zones: [], currentStroke: null, strokeBefore: null, strokePointerId: null, printWidth: 100, printHeight: 75, printUnit: 'mm', dpiPreset: '203', customDpi: 300, rotate90: false, sourceHash: null, selection: null, selectSession: null, previewPhoto: false, zoneShape: 'rect', paintSession: null};
 let importSequence = 0;
 let pendingEvidence = null;
 let baseMask = null;
@@ -64,6 +64,21 @@ function cloneStrokes(strokes) {
   });
 }
 
+function cloneZoneRegion(region) {
+  if (!region) return null;
+  if (region.type === 'rect') return {type: 'rect', rect: {...region.rect}};
+  if (region.type === 'paint') {
+    return {
+      type: 'paint',
+      strokes: (region.strokes || []).map(stroke => ({
+        radius: stroke.radius,
+        segments: (stroke.segments || []).map(point => ({x: point.x, y: point.y}))
+      }))
+    };
+  }
+  return null;
+}
+
 function cloneZones(zones) {
   return (zones || []).map(zone => ({
     rect: {...zone.rect},
@@ -71,7 +86,8 @@ function cloneZones(zones) {
     threshold: zone.threshold,
     dotsize: Number.isFinite(zone.dotsize) ? zone.dotsize : null,
     dotMm: zone.dotMm,
-    intensity: zone.intensity
+    intensity: zone.intensity,
+    region: cloneZoneRegion(zone.region)
   }));
 }
 
@@ -436,6 +452,100 @@ function applyTreatmentToMask(operation) {
   }
 }
 
+// Painted zones store only path points. Coverage is rebuilt from the path plus a
+// fixed linear falloff (1 on the centreline, 0 at radius) with a 3-4 chamfer
+// distance field, so it is deterministic and needs no seed; the field also keeps
+// the cost O(bbox) instead of O(segments x bbox).
+function zoneStrokesBBox(strokes, width, height) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const stroke of strokes) {
+    for (const point of stroke.segments) {
+      x0 = Math.min(x0, point.x - stroke.radius);
+      y0 = Math.min(y0, point.y - stroke.radius);
+      x1 = Math.max(x1, point.x + stroke.radius);
+      y1 = Math.max(y1, point.y + stroke.radius);
+    }
+  }
+  if (!Number.isFinite(x0)) return null;
+  const ax0 = clamp(Math.floor(x0), 0, width);
+  const ay0 = clamp(Math.floor(y0), 0, height);
+  const ax1 = clamp(Math.ceil(x1), 0, width);
+  const ay1 = clamp(Math.ceil(y1), 0, height);
+  if (ax1 <= ax0 || ay1 <= ay0) return null;
+  return {x0: ax0, y0: ay0, x1: ax1, y1: ay1, width: ax1 - ax0, height: ay1 - ay0};
+}
+
+function buildZoneCoverage(zone) {
+  const strokes = zone.region.strokes;
+  const width = baseCanvas.width, height = baseCanvas.height;
+  const signature = strokes.map(stroke => `${stroke.radius}:` + stroke.segments.map(point => `${point.x},${point.y}`).join(';')).join('|');
+  if (zone._coverage && zone._coverage.signature === signature) return zone._coverage;
+  const bbox = zoneStrokesBBox(strokes, width, height);
+  if (!bbox) return null;
+  const bw = bbox.width, bh = bbox.height;
+  const coverage = new Uint8Array(bw * bh);
+  for (const radius of new Set(strokes.map(stroke => stroke.radius))) {
+    const line = document.createElement('canvas');
+    line.width = bw;
+    line.height = bh;
+    const lineCtx = line.getContext('2d', {willReadFrequently: true});
+    lineCtx.strokeStyle = '#fff';
+    lineCtx.fillStyle = '#fff';
+    lineCtx.lineWidth = 1;
+    lineCtx.lineCap = 'round';
+    lineCtx.lineJoin = 'round';
+    for (const stroke of strokes) {
+      if (stroke.radius !== radius || !stroke.segments.length) continue;
+      if (stroke.segments.length === 1) {
+        const point = stroke.segments[0];
+        lineCtx.fillRect(point.x - bbox.x0, point.y - bbox.y0, 1, 1);
+        continue;
+      }
+      lineCtx.beginPath();
+      stroke.segments.forEach((point, index) => {
+        const x = point.x - bbox.x0, y = point.y - bbox.y0;
+        if (index) lineCtx.lineTo(x, y); else lineCtx.moveTo(x, y);
+      });
+      lineCtx.stroke();
+    }
+    const alpha = lineCtx.getImageData(0, 0, bw, bh).data;
+    const distance = new Float32Array(bw * bh).fill(radius * 2);
+    for (let i = 0, p = 3; i < distance.length; i++, p += 4) if (alpha[p] > 0) distance[i] = 0;
+    for (let y = 0; y < bh; y++) {
+      for (let x = 0; x < bw; x++) {
+        const i = y * bw + x;
+        let d = distance[i];
+        if (y) {
+          d = Math.min(d, distance[i - bw] + 3);
+          if (x) d = Math.min(d, distance[i - bw - 1] + 4);
+          if (x + 1 < bw) d = Math.min(d, distance[i - bw + 1] + 4);
+        }
+        if (x) d = Math.min(d, distance[i - 1] + 3);
+        distance[i] = d;
+      }
+    }
+    for (let y = bh - 1; y >= 0; y--) {
+      for (let x = bw - 1; x >= 0; x--) {
+        const i = y * bw + x;
+        let d = distance[i];
+        if (y + 1 < bh) {
+          d = Math.min(d, distance[i + bw] + 3);
+          if (x) d = Math.min(d, distance[i + bw - 1] + 4);
+          if (x + 1 < bw) d = Math.min(d, distance[i + bw + 1] + 4);
+        }
+        if (x + 1 < bw) d = Math.min(d, distance[i + 1] + 3);
+        distance[i] = d;
+      }
+    }
+    for (let i = 0; i < distance.length; i++) {
+      const value = Math.max(0, Math.min(255, Math.round(255 * (1 - (distance[i] / 3) / radius))));
+      if (value > coverage[i]) coverage[i] = value;
+    }
+  }
+  zone._coverage = {signature, mask: coverage, bbox};
+  return zone._coverage;
+}
+
 // Bayer and round-dot restart at each zone's top-left corner. Error diffusion
 // runs on the zone crop only, so no quantisation error can cross its rectangle.
 function applyZonesToMask(target) {
@@ -443,7 +553,11 @@ function applyZonesToMask(target) {
   const width = baseCanvas.width;
   const source = baseToneData.data;
   for (const zone of state.zones) {
-    const bounds = operationBounds(zone.rect, width, baseCanvas.height);
+    const painted = zone.region && zone.region.type === 'paint';
+    const coverage = painted ? buildZoneCoverage(zone) : null;
+    if (painted && !coverage) continue;
+    const bounds = painted ? coverage.bbox : operationBounds(zone.rect, width, baseCanvas.height);
+    const coverMask = painted ? coverage.mask : null;
     const zoneWidth = bounds.x1 - bounds.x0;
     const zoneHeight = bounds.y1 - bounds.y0;
     if (zoneWidth <= 0 || zoneHeight <= 0) continue;
@@ -463,6 +577,9 @@ function applyZonesToMask(target) {
     const zoneResult = zoneCtx.getImageData(0, 0, zoneWidth, zoneHeight).data;
     for (let y = 0; y < zoneHeight; y++) {
       for (let x = 0; x < zoneWidth; x++) {
+        // Coverage is a selection, not an alpha ramp: a stencil has no partial ink,
+        // so the copied mask value stays strictly 0 or 1.
+        if (coverMask && coverMask[y * zoneWidth + x] < 128) continue;
         const i = (y * zoneWidth + x) * 4;
         const lum = zoneResult[i] * .299 + zoneResult[i + 1] * .587 + zoneResult[i + 2] * .114;
         target[(bounds.y0 + y) * width + bounds.x0 + x] = lum < 128 ? 1 : 0;
@@ -887,6 +1004,76 @@ function removeZone(index) {
   status(`zone removed · ${state.zones.length} ${state.zones.length === 1 ? 'zone' : 'zones'} left.`);
 }
 
+function setZoneShape(shape) {
+  if (shape !== 'rect' && shape !== 'paint') return;
+  if (state.paintSession) {
+    state.paintSession = null;
+    viewer.classList.remove('is-drawing');
+  }
+  state.zoneShape = shape;
+  const rectButton = $('zone-shape-rect'), paintButton = $('zone-shape-paint');
+  rectButton.classList.toggle('on', shape === 'rect');
+  rectButton.setAttribute('aria-pressed', String(shape === 'rect'));
+  paintButton.classList.toggle('on', shape === 'paint');
+  paintButton.setAttribute('aria-pressed', String(shape === 'paint'));
+  if (state.img) status(shape === 'paint' ? 'Paint a zone region: drag with the brush.' : 'Zone shape: rect.');
+}
+$('zone-shape-rect').onclick = () => setZoneShape('rect');
+$('zone-shape-paint').onclick = () => setZoneShape('paint');
+
+function beginZonePaint(event) {
+  const point = canvasPoint(event);
+  if (!point) return false;
+  state.paintSession = {pointerId: event.pointerId, radius: state.brushSize, segments: [{x: point.x, y: point.y}]};
+  state.gesture = true;
+  viewer.classList.add('is-drawing');
+  status('Painting zone region…');
+  return true;
+}
+
+function appendZonePaint(event) {
+  const session = state.paintSession;
+  if (!session || session.pointerId !== event.pointerId) return;
+  const point = canvasPoint(event);
+  if (!point) return;
+  const last = session.segments[session.segments.length - 1];
+  if (Math.hypot(point.x - last.x, point.y - last.y) < Math.max(1, session.radius * .18)) return;
+  session.segments.push(point);
+}
+
+function finishZonePaint(commit) {
+  const session = state.paintSession;
+  if (!session) return;
+  state.paintSession = null;
+  state.gesture = false;
+  viewer.classList.remove('is-drawing');
+  if (!commit || !session.segments.length) return;
+  if (state.zones.length >= MAX_ZONES) {
+    status(`Zone limit reached (${MAX_ZONES}). Remove a zone first.`);
+    return;
+  }
+  const strokes = [{radius: session.radius, segments: session.segments.map(point => ({x: point.x, y: point.y}))}];
+  const bbox = zoneStrokesBBox(strokes, canvas.width, canvas.height);
+  if (!bbox || bbox.width < 8 || bbox.height < 8) {
+    status('Painted region is too small for a zone.');
+    return;
+  }
+  pushHistory();
+  state.zones.push({
+    rect: {x: bbox.x0, y: bbox.y0, width: bbox.width, height: bbox.height},
+    region: {type: 'paint', strokes},
+    method: state.method,
+    threshold: state.threshold,
+    dotsize: state.dotsize,
+    dotMm: state.dotMm,
+    intensity: state.intensity
+  });
+  invalidateBase();
+  syncControls();
+  render();
+  status(`zone ${state.zones.length} painted · ${bbox.width} × ${bbox.height} px.`);
+}
+
 function beginSelection(event) {
   const point = canvasPoint(event);
   if (!point) return false;
@@ -1102,7 +1289,10 @@ viewer.addEventListener('pointerdown', event => {
   pointers.set(event.pointerId, {x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY});
   if (pointers.size === 2) beginPinch();
   else if (state.activeTool === 'hand' || state.spaceDown || event.button === 1) beginPan(event.pointerId, event.clientX, event.clientY);
-  else if (state.activeTool === 'brush' && event.button === 0) beginBrushStroke(event);
+  else if (state.activeTool === 'brush' && event.button === 0) {
+    if (state.zoneShape === 'paint') beginZonePaint(event);
+    else beginBrushStroke(event);
+  }
   else if (state.activeTool === 'select' && event.button === 0) {
     if (canvasPoint(event)) beginSelection(event);
     else if (state.selection) clearSelection();
@@ -1132,12 +1322,15 @@ viewer.addEventListener('pointermove', event => {
     applyViewTransform();
   } else if (state.currentStroke && state.strokePointerId === event.pointerId) {
     appendBrushPoint(event);
+  } else if (state.paintSession && state.paintSession.pointerId === event.pointerId) {
+    appendZonePaint(event);
   }
 });
 
 function finishPointer(event) {
   if (state.selectSession && state.selectSession.pointerId === event.pointerId) finishSelection(event);
   if (state.currentStroke && state.strokePointerId === event.pointerId) finishBrushStroke(event.type === 'pointerup');
+  if (state.paintSession && state.paintSession.pointerId === event.pointerId) finishZonePaint(event.type === 'pointerup');
   const point = pointers.get(event.pointerId);
   pointers.delete(event.pointerId);
   if (panSession?.pointerId === event.pointerId) panSession = null;
@@ -1791,6 +1984,12 @@ $('download-evidence').onclick = () => {
 $('undo').onclick = undo;
 $('redo').onclick = redo;
 window.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && state.paintSession) {
+    event.preventDefault();
+    finishZonePaint(false);
+    status('Painted region discarded.');
+    return;
+  }
   if (event.key === 'Escape' && state.selection) {
     event.preventDefault();
     clearSelection();
@@ -1901,6 +2100,19 @@ function normalizeProjectStrokes(value) {
   });
 }
 
+function normalizeZoneRegion(value, fallbackRect, width, height) {
+  if (!value || value.type !== 'paint' || !Array.isArray(value.strokes)) return {type: 'rect', rect: {...fallbackRect}};
+  const strokes = value.strokes.slice(0, 32).map(stroke => ({
+    radius: clamp(Math.round(finiteNumberOr(stroke && stroke.radius, 12)), 1, 400),
+    segments: Array.isArray(stroke && stroke.segments) ? stroke.segments.slice(0, 20000).map(point => ({
+      x: clamp(finiteNumberOr(point && point.x, 0), 0, width),
+      y: clamp(finiteNumberOr(point && point.y, 0), 0, height)
+    })) : []
+  })).filter(stroke => stroke.segments.length);
+  if (!strokes.length) return {type: 'rect', rect: {...fallbackRect}};
+  return {type: 'paint', strokes};
+}
+
 function normalizeProjectZones(value) {
   if (value == null) return [];
   if (!Array.isArray(value)) throw new Error('Project zones must be an array.');
@@ -1913,8 +2125,16 @@ function normalizeProjectZones(value) {
     const width = bounds.x1 - bounds.x0;
     const height = bounds.y1 - bounds.y0;
     if (width < 8 || height < 8) throw new Error(`Zone ${index + 1} must be at least 8 × 8 px.`);
+    const region = normalizeZoneRegion(zone.region, {x: bounds.x0, y: bounds.y0, width, height}, state.img.width, state.img.height);
+    let zoneRect = {x: bounds.x0, y: bounds.y0, width, height};
+    if (region.type === 'paint') {
+      const bbox = zoneStrokesBBox(region.strokes, state.img.width, state.img.height);
+      if (!bbox || bbox.width < 8 || bbox.height < 8) throw new Error(`Zone ${index + 1} painted region is empty.`);
+      zoneRect = {x: bbox.x0, y: bbox.y0, width: bbox.width, height: bbox.height};
+    }
     return {
-      rect: {x: bounds.x0, y: bounds.y0, width, height},
+      rect: zoneRect,
+      region,
       method: DITHER_METHODS.has(zone.method) ? zone.method : 'none',
       threshold: clamp(Math.round(finiteNumberOr(zone.threshold, 0)), 0, 100),
       dotsize: zone.dotsize === null || zone.dotsize === undefined ? null : clamp(Math.round(finiteNumberOr(zone.dotsize, 4)), 1, 16),
@@ -2101,7 +2321,13 @@ function buildEvidence() {
       }
     },
     strokes: cloneStrokes(state.strokes),
-    zones: cloneZones(state.zones),
+    zones: cloneZones(state.zones).map(zone => {
+      if (zone.region && zone.region.type === 'paint') {
+        return {...zone, bbox: zoneStrokesBBox(zone.region.strokes, state.img.width, state.img.height)};
+      }
+      const {region, ...rectZone} = zone;
+      return rectZone;
+    }),
     exported_at: new Date().toISOString()
   };
 }
