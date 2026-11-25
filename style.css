@@ -1,4 +1,4 @@
-:root{font-family:Arial,Helvetica,sans-serif;color:#242424;background:#f5f5f3;font-size:14px;font-synthesis:none}
+:root{--tint-paint:#4b7bff;font-family:Arial,Helvetica,sans-serif;color:#242424;background:#f5f5f3;font-size:14px;font-synthesis:none}
 *{box-sizing:border-box}
 body{margin:0;overflow:hidden;background:radial-gradient(ellipse at 85% 5%,#e9e7ee66,transparent 65%)}
 .app{display:grid;grid-template-rows:56px 1fr auto 40px;height:100dvh}

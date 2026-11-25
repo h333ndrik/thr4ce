@@ -92,7 +92,7 @@ Select a rectangle on the canvas, then choose **Add zone**. Painted regions stor
 
 Zones come in two shapes: **rect** (drag a selection, then **Add zone**) and **paint** (switch the Zones shape control to paint, then drag on the canvas with the brush). A painted region is a freeform band that follows the path, so a halftone can follow an arm instead of a rectangle. Coverage is a selection, not an alpha ramp: the mask stays strictly 1-bit, so the painted boundary is hard with no feathered edge.
 
-While you drag, the canvas shows the region you are painting as a flat tint; the zone is dithered once when you release the pointer, so a drag stays responsive. On release the status reads the painted area, for example `zone 1 painted · 81 584 px` — the coverage, not the bounding box.
+While you drag, the canvas shows the region you are painting as a flat tint; the zone is dithered once when you release the pointer, so a drag stays responsive. That blue tint is a placement aid only — it is never part of the mask, the project, or the export, and the red 58 mm roll guide steps aside while you paint. On release the status reads the painted area, for example `zone 1 painted · 81 584 px` — the coverage, not the bounding box.
 
 Zones override only the dithering treatment, not tone, Levels, pre-blur, or mirroring. Error diffusion runs inside each zone rectangle, so its error cannot spill outside. Bayer and round-dot patterns restart at the zone’s top-left corner. Zone edges can therefore show seams; that is intentional and visible.
 

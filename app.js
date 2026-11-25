@@ -5,6 +5,11 @@ const ctx = canvas.getContext('2d', {willReadFrequently: true});
 const viewer = $('viewer');
 const paintTint = $('paint-tint');
 const paintTintCtx = paintTint.getContext('2d');
+// The tint colour lives in one place (:root --tint-paint); this only decodes it.
+const tintPaintRgb = (() => {
+  const value = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tint-paint').trim().replace('#', ''), 16);
+  return Number.isFinite(value) ? [(value >> 16) & 255, (value >> 8) & 255, value & 255] : [255, 255, 255];
+})();
 const stage = $('canvas-stage');
 const zoomLabel = $('zoom-label');
 const brushRing = $('brush-ring');
@@ -572,10 +577,10 @@ function paintZoneTint() {
   for (let i = 0; i < coverage.mask.length; i++) {
     if (coverage.mask[i] < 128) continue;
     const p = i * 4;
-    data[p] = 255;
-    data[p + 1] = 75;
-    data[p + 2] = 75;
-    data[p + 3] = 96;
+    data[p] = tintPaintRgb[0];
+    data[p + 1] = tintPaintRgb[1];
+    data[p + 2] = tintPaintRgb[2];
+    data[p + 3] = 115;
   }
   paintTintCtx.putImageData(image, bbox.x0, bbox.y0);
   session.tintBox = {x: bbox.x0, y: bbox.y0, w: bw, h: bh};
@@ -838,7 +843,7 @@ function updateRollGuide() {
   }
   const {dpi, width} = printPixels();
   const guideX = (58 * dpi / 25.4) * (canvas.width / width);
-  const visible = guideX > 0 && guideX < canvas.width;
+  const visible = guideX > 0 && guideX < canvas.width && !state.paintSession;
   rollGuide.hidden = !visible;
   if (!visible) return;
   rollGuide.style.left = `${guideX}px`;
@@ -1052,6 +1057,7 @@ function setZoneShape(shape) {
   if (state.paintSession) {
     clearZoneTint();
     state.paintSession = null;
+    updateRollGuide();
     viewer.classList.remove('is-drawing');
   }
   state.zoneShape = shape;
@@ -1071,6 +1077,7 @@ function beginZonePaint(event) {
   state.paintSession = {pointerId: event.pointerId, radius: state.brushSize, segments: [{x: point.x, y: point.y}]};
   state.gesture = true;
   viewer.classList.add('is-drawing');
+  updateRollGuide();
   paintZoneTint();
   status('Painting zone region…');
   return true;
@@ -1092,6 +1099,7 @@ function finishZonePaint(commit) {
   if (!session) return;
   clearZoneTint();
   state.paintSession = null;
+  updateRollGuide();
   state.gesture = false;
   viewer.classList.remove('is-drawing');
   if (!commit || !session.segments.length) return;
