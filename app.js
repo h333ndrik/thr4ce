@@ -28,11 +28,11 @@ const DEFAULTS = {brightness: 0, contrast: 0, blackPoint: 0, whitePoint: 100, pr
 // intentionally excluded: transfer orientation always remains the user's choice.
 const PRESETS = {
   clean: {label: 'clean stencil', brightness: 0, contrast: 0, method: 'none', despeckle: true, threshold: 'otsu'},
-  newsprint: {label: 'newsprint', brightness: 8, contrast: 5, method: 'round-dot', dotsize: 5, intensity: 55},
-  halftone: {label: 'halftone', brightness: 12, contrast: 0, method: 'round-dot', dotsize: 8, intensity: 50},
-  xerox: {label: 'xerox', brightness: 8, contrast: 60, method: 'bayer', dotsize: 3, intensity: 70},
-  riso: {label: 'riso', brightness: -4, contrast: 25, method: 'jarvis', dotsize: 2, intensity: 65},
-  decay: {label: 'decay', brightness: -8, contrast: 35, method: 'floyd-steinberg', dotsize: 3, intensity: 80}
+  newsprint: {label: 'newsprint', brightness: 8, contrast: 5, method: 'round-dot', dotPx: 2, intensity: 55},
+  halftone: {label: 'halftone', brightness: 12, contrast: 0, method: 'round-dot', dotPx: 3, intensity: 50},
+  xerox: {label: 'xerox', brightness: 8, contrast: 60, method: 'bayer', dotPx: 1, intensity: 70},
+  riso: {label: 'riso', brightness: -4, contrast: 25, method: 'jarvis', dotPx: 1, intensity: 65},
+  decay: {label: 'decay', brightness: -8, contrast: 35, method: 'floyd-steinberg', dotPx: 1, intensity: 80}
 };
 const state = {...DEFAULTS, img: null, name: '', history: [], future: [], gesture: false, comparing: false, raf: 0, zoom: 1, panX: 0, panY: 0, zoomMode: 'fit', activeTool: 'brush', spaceDown: false, renderMs: 0, renderMode: 'rgb', inkPercent: 0, strokes: [], zones: [], currentStroke: null, strokeBefore: null, strokePointerId: null, printWidth: 100, printHeight: 75, printUnit: 'mm', dpiPreset: '203', customDpi: 300, rotate90: false, sourceHash: null, selection: null, selectSession: null, previewPhoto: false};
 let importSequence = 0;
@@ -542,10 +542,31 @@ function dotMillimetres() {
   return Math.round(state.dotsize * (state.printWidth * UNIT_MM[state.printUnit] / sourceWidth) * 100) / 100;
 }
 
+// One slider stop per print pixel. The grid is derived from the print dpi, so at
+// 300 dpi it becomes finer automatically; every stop yields a distinct dot.
+function dotPxMm() {
+  return 25.4 / printDpi();
+}
+
+function syncDotSlider() {
+  const pxMm = dotPxMm();
+  const el = $('dotsize');
+  el.min = String(pxMm);
+  el.max = String(16 * pxMm * (1 + 1e-12));
+  el.step = String(pxMm);
+  if (Number.isFinite(state.dotsize)) return;
+  state.dotMm = clamp(Math.round(state.dotMm / pxMm), 1, 16) * pxMm;
+  el.value = String(state.dotMm);
+}
+
 function updateDotReadout() {
+  syncDotSlider();
+  const legacy = Number.isFinite(state.dotsize);
   const dotMm = dotMillimetres();
-  $('dotsize').value = String(clamp(dotMm, .1, 2));
-  $('dotsize-value').textContent = `${dotMm.toFixed(2)} mm · ${dotPrintPixels()} px @ ${printDpi()} dpi`;
+  $('dotsize-value').textContent = legacy
+    ? `legacy ${dotMm.toFixed(2)} mm · ${dotPrintPixels()} px`
+    : `${dotMm.toFixed(2)} mm · ${dotPrintPixels()} px @ ${printDpi()} dpi`;
+  $('dotsize-value').classList.toggle('legacy', legacy);
   $('dotsize-note').hidden = dotMm >= .3;
 }
 
@@ -1438,7 +1459,7 @@ function seededInteger(seed, field, min, max) {
 function randomizedSettings(seed) {
   return {
     method: RANDOM_METHODS[seededInteger(seed, 'method', 0, RANDOM_METHODS.length - 1)],
-    dotsize: seededInteger(seed, 'dotsize', 2, 12),
+    dotPx: seededInteger(seed, 'dotPx', 1, 16),
     intensity: seededInteger(seed, 'intensity', 25, 85),
     brightness: seededInteger(seed, 'brightness', -30, 30),
     contrast: seededInteger(seed, 'contrast', 20, 80),
@@ -1450,7 +1471,11 @@ function randomize(seed = seedHex()) {
   if (!state.img) return;
   pushHistory();
   state.previewPhoto = false;
-  Object.assign(state, randomizedSettings(seed), {randomSeed: seed});
+  const {dotPx, ...settings} = randomizedSettings(seed);
+  Object.assign(state, settings, {randomSeed: seed});
+  state.dotMm = dotPx * dotPxMm();
+  state.dotsize = null;
+  for (const zone of state.zones) zone.dotsize = null;
   invalidateBase();
   syncControls();
   render();
@@ -1462,8 +1487,13 @@ function applyPreset(id) {
   if (!state.img || !preset) return;
   pushHistory();
   state.previewPhoto = false;
-  const {label, threshold, ...settings} = preset;
+  const {label, threshold, dotPx, ...settings} = preset;
   Object.assign(state, settings);
+  if (typeof dotPx === 'number') {
+    state.dotMm = clamp(dotPx, 1, 16) * dotPxMm();
+    state.dotsize = null;
+    for (const zone of state.zones) zone.dotsize = null;
+  }
   if (threshold === 'otsu') state.threshold = clamp(Math.round(otsuThreshold() / 2.55), 1, 100);
   invalidateBase();
   syncControls();
@@ -1471,7 +1501,7 @@ function applyPreset(id) {
   if (preset.method === 'none') {
     status(`preset applied: ${label} · Otsu threshold${preset.despeckle ? ' · despeckle' : ''}`);
   } else {
-    status(`preset applied: ${label} · ${ZONE_METHOD_LABELS[preset.method]} dithering · dot ${state.dotsize} · intensity ${state.intensity}`);
+    status(`preset applied: ${label} · ${ZONE_METHOD_LABELS[preset.method]} dithering · dot ${dotPrintPixels()} px · intensity ${state.intensity}`);
   }
 }
 
@@ -1556,7 +1586,8 @@ for (const id of ['brightness', 'contrast', 'threshold', 'intensity']) {
 $('dotsize').addEventListener('input', () => {
   if (!state.gesture) { pushHistory(); state.gesture = true; }
   state.previewPhoto = false;
-  state.dotMm = Number($('dotsize').value);
+  const pxMm = dotPxMm();
+  state.dotMm = clamp(Math.round(Number($('dotsize').value) / pxMm), 1, 16) * pxMm;
   state.dotsize = null;
   for (const zone of state.zones) zone.dotsize = null;
   invalidateBase();

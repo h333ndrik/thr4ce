@@ -64,18 +64,18 @@ Pre-blur softens scan grain before Levels, thresholding, and dithering. It also 
 
 ## Dot size
 
-Dot size is set in millimetres (0.10–2.00 mm, default 0.25 mm) and the readout shows the print pixels beside it, for example `0.25 mm · 2 px @ 203 dpi`. The source-pixel block size is derived from the current print width, so the same value prints the same physical size on every scan. Below ~0.3 mm transfer is unreliable. Projects saved before this change keep their original pixel-based dot sizes and load unchanged; moving the slider switches them to millimetres.
+Dot size is set in millimetres on a grid derived from the print resolution: one stop per print pixel (`25.4 / dpi` mm) from 1 to 16 print pixels, so 16 distinct sizes from 0.13 to 2.00 mm at 203 dpi. The readout shows the print pixels beside the value, for example `0.38 mm · 3 px @ 203 dpi`; every stop changes the dot by exactly one print pixel, and raising the dpi makes the grid finer automatically. Below ~0.3 mm transfer is unreliable. Presets set their dot in print pixels, so a preset prints the same dot on every scan. Projects saved before this change keep their original pixel-based dot sizes and load unchanged; moving the slider or applying a preset switches them to the grid.
 
 ## Presets
 
 Presets tune existing controls only and never change mirror orientation.
 
 - **Clean Stencil:** neutral tone, Otsu threshold, clean thresholding, despeckle.
-- **Newsprint:** round-dot halftone, dot size 5, intensity 55, brightness 8.
-- **Halftone:** round-dot halftone, dot size 8, intensity 50, brightness 12.
-- **Xerox:** Bayer grid, dot size 3, intensity 70, brightness 8, contrast 60.
-- **Riso:** Jarvis dithering, dot size 2, intensity 65, brightness -4.
-- **Decay:** Floyd–Steinberg, dot size 3, intensity 80, brightness -8.
+- **Newsprint:** round-dot halftone, dot 2 px, intensity 55, brightness 8.
+- **Halftone:** round-dot halftone, dot 3 px, intensity 50, brightness 12.
+- **Xerox:** Bayer grid, dot 1 px, intensity 70, brightness 8, contrast 60.
+- **Riso:** Jarvis dithering, dot 1 px, intensity 65, brightness -4.
+- **Decay:** Floyd–Steinberg, dot 1 px, intensity 80, brightness -8.
 
 Each preset click is one undo step.
 
