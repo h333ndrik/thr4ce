@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>thr4ce · tabs + dock wireframe</title>
+<style>
+:root{--bg:#f5f5f3;--ink:#242424;--muted:#777;--label:#8a8a86;--line:#d2d2ce;--sep:#ddd;--viewer:#101010;--panel:320px;--header:56px;--status:40px;--tabs:36px}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font:14px Arial,Helvetica,sans-serif;color:var(--ink);background:var(--bg);background-image:radial-gradient(ellipse at 85% 5%,#e9e7ee66,transparent 65%);overflow:hidden}
+.app{display:grid;grid-template-rows:var(--header) 1fr auto var(--status);height:100vh}
+
+header{display:flex;align-items:center;gap:6px;padding:0 14px;border-bottom:1px solid var(--sep)}
+.brand{font-size:17px;letter-spacing:.1em;font-weight:600;margin-right:8px}
+.right{margin-left:auto;display:flex;gap:8px;align-items:center}
+button{font:inherit;font-size:12px;padding:8px 12px;background:transparent;border:1px solid var(--line);border-radius:4px;color:inherit;cursor:pointer;white-space:nowrap}
+button:hover{border-color:#777}
+button:disabled{opacity:.4;cursor:default}
+.primary{background:#252525;color:#fff;border-color:#252525}
+.quiet{border:0;padding:6px 5px;color:var(--muted)}
+
+main{display:grid;grid-template-columns:1fr var(--panel);min-height:0}
+.viewer{position:relative;background:var(--viewer);overflow:hidden;display:grid;place-items:center}
+.ph{width:78%;aspect-ratio:1.41;background:#e9e9e7;position:relative;display:grid;place-items:center}
+.ph span{font-size:12px;color:#9a9a96}
+.cross{position:absolute;inset:0;width:100%;height:100%;stroke:#c9c9c4;fill:none;vector-effect:non-scaling-stroke}
+.guide{position:absolute;top:0;bottom:0;left:62%;border-left:1px dashed #ff4b4b;z-index:2}
+.guide span{position:absolute;top:8px;left:4px;font-size:10px;color:#ff6b6b;background:#101010cc;padding:2px 4px}
+.ov{position:absolute;z-index:5;display:flex;gap:4px;padding:4px;background:#101010cc;border:1px solid #333;border-radius:5px}
+.ov button{padding:5px 9px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#ddd;border-color:#444}
+.ov .on{background:#fff;color:#101010;border-color:#fff}
+.tl{top:10px;left:10px}
+.bl{bottom:10px;left:10px;flex-direction:column;align-items:stretch}
+.bl .tools,.bl .cmp{display:flex;gap:4px}
+.bl .cmp button{width:100%}
+.br{bottom:10px;right:10px;align-items:center;font-size:10px;letter-spacing:.08em;color:#aaa;font-variant-numeric:tabular-nums}
+
+aside{display:grid;grid-template-rows:var(--tabs) 1fr;border-left:1px solid var(--sep);min-height:0}
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--sep)}
+.tabs button{border:0;border-radius:0;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.tabs .on{background:#252525;color:#fff}
+.panel{overflow-y:auto;padding:12px 16px 20px;min-height:0}
+.group h3{display:flex;justify-content:space-between;gap:10px;margin:0 0 10px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--label);font-weight:500}
+.group h3 span{color:#a8a8a4;letter-spacing:.05em}
+.group + .group{margin-top:22px;padding-top:18px;border-top:1px solid var(--sep)}
+.row{display:flex;justify-content:space-between;gap:10px;font-size:12px;margin-top:9px}
+.row output{font-variant-numeric:tabular-nums}
+input[type=range]{-webkit-appearance:none;appearance:none;display:block;width:100%;height:14px;margin:1px 0 0;background:transparent}
+input[type=range]::-webkit-slider-runnable-track{height:1px;background:#8a8a86}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:9px;height:9px;margin-top:-4px;border-radius:0;background:var(--bg);border:1px solid var(--ink)}
+input[type=range]::-moz-range-track{height:1px;background:#8a8a86}
+input[type=range]::-moz-range-thumb{width:9px;height:9px;border-radius:0;background:var(--bg);border:1px solid var(--ink)}
+.seg{display:grid;grid-auto-flow:column;gap:3px;margin-top:8px}
+.seg button{padding:6px 2px;font-size:10px;letter-spacing:.03em;text-transform:uppercase;min-width:0;overflow:hidden}
+.seg .on{background:#252525;color:#fff;border-color:#252525}
+.wide{width:100%;margin-top:8px}
+.num{width:100%;padding:7px 8px;border:1px solid var(--line);border-radius:4px;font:inherit;font-size:12px;background:#fff}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:9px}
+.note{font-size:11px;color:var(--muted);line-height:1.5;margin:9px 0 0}
+.chk{display:flex;align-items:center;gap:7px;font-size:11px;color:#666;margin-top:9px}
+
+.dock{border-top:1px solid var(--sep);padding:9px 14px;display:grid;gap:7px}
+.dock .row1{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.dock .modes{display:grid;grid-auto-flow:column;gap:3px}
+.dock .modes button{padding:6px 13px;font-size:10px;letter-spacing:.06em;text-transform:uppercase}
+.dock .modes .on{background:#252525;color:#fff;border-color:#252525}
+.dock .checks{margin-left:auto;display:flex;gap:16px;align-items:center}
+.dock .checks .chk{margin:0}
+.dock .sliders{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.dock .sliders .row{margin-top:0}
+.dock .chips{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.chip{padding:6px 10px;font-size:11px;border:1px solid var(--line);border-radius:4px;font-variant-numeric:tabular-nums}
+
+.status{display:flex;align-items:center;padding:0 14px;border-top:1px solid var(--sep);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+#measure{position:fixed;right:14px;bottom:48px;z-index:99;max-width:min(620px,calc(100vw - 380px));padding:6px 9px;font-size:10px;line-height:1.5;color:#333;background:#ffffffee;border:1px solid var(--line);border-radius:4px;font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <span class="brand">thr4ce</span>
+    <button disabled>↶</button>
+    <button disabled>↷</button>
+    <button class="quiet">reset</button>
+    <div class="right">
+      <button class="quiet">shortcuts</button>
+      <button class="quiet">full</button>
+      <button>import image</button>
+      <button class="primary">export…</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="viewer">
+      <div class="guide"><span>58 mm</span></div>
+      <div class="ph">
+        <svg class="cross" viewBox="0 0 100 100" preserveAspectRatio="none">
+          <line x1="0" y1="0" x2="100" y2="100"/><line x1="100" y1="0" x2="0" y2="100"/>
+        </svg>
+        <span>image preview</span>
+      </div>
+      <div class="ov tl"><button class="on">photo</button><button>stencil</button><button>◐</button></div>
+      <div class="ov bl">
+        <div class="tools"><button class="on">brush</button><button>hand</button><button>select</button></div>
+        <div class="cmp"><button>compare</button></div>
+      </div>
+      <div class="ov br"><button>−</button><span>250%</span><button>fit</button><button>+</button></div>
+    </div>
+
+    <aside>
+      <div class="tabs">
+        <button data-tab="tone">tone</button>
+        <button data-tab="dither" class="on">dither</button>
+        <button data-tab="print">print</button>
+      </div>
+
+      <div class="panel" data-tab="tone" hidden>
+        <div class="group">
+          <h3>tone <span>before the mask</span></h3>
+          <div class="row"><span>brightness</span><output>0</output></div>
+          <input type="range" min="-100" max="100" value="0">
+          <div class="row"><span>contrast</span><output>0</output></div>
+          <input type="range" min="-100" max="100" value="0">
+          <div class="row"><span>black point</span><output>0</output></div>
+          <input type="range" min="0" max="100" value="0">
+          <div class="row"><span>white point</span><output>100</output></div>
+          <input type="range" min="0" max="100" value="100">
+          <div class="row"><span>pre-blur</span><output>0 px</output></div>
+          <input type="range" min="0" max="6" value="0">
+        </div>
+      </div>
+
+      <div class="panel" data-tab="dither">
+        <div class="group">
+          <h3>threshold <span>auto · otsu</span></h3>
+          <div class="row"><span>threshold</span><output>off</output></div>
+          <input type="range" min="0" max="100" value="0">
+          <button class="wide">auto threshold</button>
+        </div>
+        <div class="group">
+          <h3>dither <span>replaces threshold</span></h3>
+          <div class="seg">
+            <button>none</button><button>floyd</button><button>jarvis</button><button>bayer</button><button class="on">round</button>
+          </div>
+          <div class="row"><span>dot size</span><output>6</output></div>
+          <input type="range" min="1" max="16" value="6">
+          <div class="row"><span>intensity</span><output>50</output></div>
+          <input type="range" min="0" max="100" value="50">
+          <div class="seg">
+            <button>clean</button><button>news</button><button>half</button><button>xerox</button><button>riso</button><button>decay</button>
+          </div>
+          <button class="wide">↻ randomize</button>
+        </div>
+      </div>
+
+      <div class="panel" data-tab="print" hidden>
+        <div class="group">
+          <h3>print <span>203 dpi · 58 mm</span></h3>
+          <div class="pair">
+            <input class="num" value="100" aria-label="print width">
+            <input class="num" value="75" aria-label="print height">
+          </div>
+          <div class="seg"><button class="on">mm</button><button>cm</button><button>inch</button></div>
+          <div class="seg"><button class="on">203</button><button>300</button><button>600</button><button>custom</button></div>
+          <p class="note">prints at 10.0 × 7.5 cm @ 203 dpi · 799 × 599 px</p>
+          <div class="chk"><input type="checkbox" id="inv"><label for="inv">invert · white on black</label></div>
+          <div class="seg"><button>mirror</button><button>rotate 90°</button></div>
+          <button class="primary wide">export…</button>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <div class="dock">
+    <div class="row1">
+      <div class="modes">
+        <button class="on">break</button><button>thin</button><button>fatten</button><button>dissolve</button><button>restore</button>
+      </div>
+      <div class="checks">
+        <label class="chk"><input type="checkbox" checked> ghost</label>
+        <label class="chk"><input type="checkbox"> despeckle</label>
+      </div>
+    </div>
+    <div class="sliders">
+      <div><div class="row"><span>radius</span><output>12</output></div><input type="range" min="2" max="64" value="12"></div>
+      <div><div class="row"><span>strength</span><output>50</output></div><input type="range" min="0" max="100" value="50"></div>
+      <div><div class="row"><span>scatter</span><output>0</output></div><input type="range" min="0" max="100" value="0"></div>
+    </div>
+    <div class="chips">
+      <span class="chip">zone 1 · bayer ×</span>
+      <span class="chip">zone 2 · round-dot ×</span>
+      <button>+</button>
+    </div>
+  </div>
+
+  <div class="status"><span>thresh 45 · round-dot · dot 6 · 41% ink · 250%</span></div>
+</div>
+
+<div id="measure"></div>
+
+<script>
+const q = s => document.querySelector(s);
+const panels = [...document.querySelectorAll('.panel')];
+const tabs = [...document.querySelectorAll('.tabs button')];
+const h = el => Math.round(el.getBoundingClientRect().height * 10) / 10;
+
+function fitAll() {
+  const active = panels.find(p => !p.hidden);
+  const out = [];
+  for (const p of panels) {
+    p.hidden = false;
+    out.push(p.dataset.tab + ' ' + p.scrollHeight + (p.scrollHeight > p.clientHeight + 1 ? ' SCROLLS' : ' fits'));
+    p.hidden = p.dataset.tab !== active.dataset.tab;
+  }
+  return out.join(' · ');
+}
+
+function report() {
+  const text = 'header ' + h(q('header'))
+    + ' · dock ' + h(q('.dock'))
+    + ' [ ' + h(q('.dock .row1')) + ' + ' + h(q('.dock .sliders')) + ' + ' + h(q('.dock .chips')) + ' ]'
+    + ' · status ' + h(q('.status'))
+    + ' · viewer ' + h(q('.viewer'))
+    + ' ‖ ' + fitAll();
+  q('#measure').textContent = text;
+  console.info(text);
+}
+
+tabs.forEach(b => b.onclick = () => {
+  tabs.forEach(t => t.classList.toggle('on', t === b));
+  panels.forEach(p => p.hidden = p.dataset.tab !== b.dataset.tab);
+  report();
+});
+addEventListener('resize', report);
+report();
+</script>
+</body>
+</html>
