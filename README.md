@@ -62,6 +62,10 @@ Black point and white point remap luminance after brightness/contrast and before
 
 Pre-blur softens scan grain before Levels, thresholding, and dithering. It also softens fine lines, so use the smallest amount that cleans the scan. Both settings are part of undo history, project files, and export evidence.
 
+## Dot size
+
+Dot size is set in millimetres (0.10–2.00 mm, default 0.25 mm) and the readout shows the print pixels beside it, for example `0.25 mm · 2 px @ 203 dpi`. The source-pixel block size is derived from the current print width, so the same value prints the same physical size on every scan. Below ~0.3 mm transfer is unreliable. Projects saved before this change keep their original pixel-based dot sizes and load unchanged; moving the slider switches them to millimetres.
+
 ## Presets
 
 Presets tune existing controls only and never change mirror orientation.

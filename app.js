@@ -23,7 +23,7 @@ const mirrorCanvas = document.createElement('canvas');
 const mirrorCtx = mirrorCanvas.getContext('2d', {willReadFrequently: true});
 const MIN_ZOOM = .25, MAX_ZOOM = 8, MAX_ZONES = 8, FIT_MIN_ZOOM = .01, ZOOM_STEP = 1.25;
 const UNIT_MM = {mm: 1, cm: 10, inch: 25.4};
-const DEFAULTS = {brightness: 0, contrast: 0, blackPoint: 0, whitePoint: 100, preBlur: 0, threshold: 0, method: 'none', dotsize: 4, intensity: 50, mirrored: false, despeckle: false, brushMode: 'break', brushSize: 12, brushStrength: 50, ghost: true, invert: false, randomSeed: null};
+const DEFAULTS = {brightness: 0, contrast: 0, blackPoint: 0, whitePoint: 100, preBlur: 0, threshold: 0, method: 'none', dotsize: null, dotMm: 0.25, intensity: 50, mirrored: false, despeckle: false, brushMode: 'break', brushSize: 12, brushStrength: 50, ghost: true, invert: false, randomSeed: null};
 // Each preset tunes only the existing tonal and dithering controls. Mirror is
 // intentionally excluded: transfer orientation always remains the user's choice.
 const PRESETS = {
@@ -67,7 +67,8 @@ function cloneZones(zones) {
     rect: {...zone.rect},
     method: zone.method,
     threshold: zone.threshold,
-    dotsize: zone.dotsize,
+    dotsize: Number.isFinite(zone.dotsize) ? zone.dotsize : null,
+    dotMm: zone.dotMm,
     intensity: zone.intensity
   }));
 }
@@ -79,8 +80,8 @@ function invalidateBase() {
 
 function status(message) { $('status').textContent = message; }
 function snapshot() {
-  const {brightness, contrast, blackPoint, whitePoint, preBlur, threshold, method, dotsize, intensity, mirrored, invert, despeckle, randomSeed} = state;
-  return {brightness, contrast, blackPoint, whitePoint, preBlur, threshold, method, dotsize, intensity, mirrored, invert, despeckle, randomSeed, strokes: cloneStrokes(state.strokes), zones: cloneZones(state.zones)};
+  const {brightness, contrast, blackPoint, whitePoint, preBlur, threshold, method, dotsize, dotMm, intensity, mirrored, invert, despeckle, randomSeed} = state;
+  return {brightness, contrast, blackPoint, whitePoint, preBlur, threshold, method, dotsize, dotMm, intensity, mirrored, invert, despeckle, randomSeed, strokes: cloneStrokes(state.strokes), zones: cloneZones(state.zones)};
 }
 function cloneSnapshot(value) {
   return {...value, strokes: cloneStrokes(value.strokes || []), zones: cloneZones(value.zones || [])};
@@ -345,7 +346,7 @@ function buildBaseData() {
   prepareToneCanvas(baseCanvas, baseCtx);
   baseToneData = baseCtx.getImageData(0, 0, baseCanvas.width, baseCanvas.height);
 
-  if (state.method !== 'none') applyDither(baseCtx, state.method, state.dotsize, state.intensity);
+  if (state.method !== 'none') applyDither(baseCtx, state.method, effectiveDotSourcePx(null), state.intensity);
   else if (state.threshold > 0) applyThreshold(baseCtx, state.threshold * 2.55);
 
   const pixels = baseCtx.getImageData(0, 0, baseCanvas.width, baseCanvas.height).data;
@@ -399,7 +400,7 @@ function applyZonesToMask(target) {
       zonePixels.data.set(source.subarray(sourceStart, sourceStart + zoneWidth * 4), y * zoneWidth * 4);
     }
     zoneCtx.putImageData(zonePixels, 0, 0);
-    if (zone.method !== 'none') applyDither(zoneCtx, zone.method, zone.dotsize, zone.intensity);
+    if (zone.method !== 'none') applyDither(zoneCtx, zone.method, effectiveDotSourcePx(zone), zone.intensity);
     else if (zone.threshold > 0) applyThreshold(zoneCtx, zone.threshold * 2.55);
 
     const zoneResult = zoneCtx.getImageData(0, 0, zoneWidth, zoneHeight).data;
@@ -513,6 +514,41 @@ function printPixels() {
   };
 }
 
+// Single source of truth for the dither block size in source pixels. dpi cancels
+// out: both the dot and the print width scale with it. Rounding the dot to whole
+// print pixels is deliberate — a thermal printer cannot resolve fractions of a dot.
+function effectiveDotSourcePx(zone) {
+  const legacy = zone ? zone.dotsize : state.dotsize;
+  if (Number.isFinite(legacy)) return Math.max(1, Math.round(legacy));
+  const dotMm = Number.isFinite(zone?.dotMm) ? zone.dotMm : state.dotMm;
+  const {dpi, width} = printPixels();
+  const sourceWidth = baseCanvas.width || (state.img ? state.img.width : 1);
+  const dotPrintPx = Math.max(1, Math.round(dotMm / 25.4 * dpi));
+  return Math.max(1, Math.round(dotPrintPx * sourceWidth / width));
+}
+
+function dotPrintPixels() {
+  if (!state.img) return Math.max(1, Math.round(state.dotMm / 25.4 * printDpi()));
+  const {width} = printPixels();
+  const sourceWidth = baseCanvas.width || state.img.width;
+  const exact = effectiveDotSourcePx(null) * width / sourceWidth;
+  // A legacy source-pixel size rarely lands on a whole print pixel; keep the fraction visible.
+  return Number.isFinite(state.dotsize) ? Math.round(exact * 10) / 10 : Math.max(1, Math.round(exact));
+}
+
+function dotMillimetres() {
+  if (!Number.isFinite(state.dotsize)) return state.dotMm;
+  const sourceWidth = baseCanvas.width || (state.img ? state.img.width : 1);
+  return Math.round(state.dotsize * (state.printWidth * UNIT_MM[state.printUnit] / sourceWidth) * 100) / 100;
+}
+
+function updateDotReadout() {
+  const dotMm = dotMillimetres();
+  $('dotsize').value = String(clamp(dotMm, .1, 2));
+  $('dotsize-value').textContent = `${dotMm.toFixed(2)} mm · ${dotPrintPixels()} px @ ${printDpi()} dpi`;
+  $('dotsize-note').hidden = dotMm >= .3;
+}
+
 function updateExportSummary() {
   if (!$('export-summary-size')) return;
   const dpi = printDpi();
@@ -547,6 +583,7 @@ function syncPrintControls() {
   const heightCm = state.printHeight * UNIT_MM[state.printUnit] / 10;
   $('print-summary').textContent = `prints at ${widthCm.toFixed(1)} × ${heightCm.toFixed(1)} cm @ ${printDpi()} dpi`;
   updateExportSummary();
+  updateDotReadout();
   updateRollGuide();
 }
 
@@ -746,6 +783,7 @@ function addZoneFromSelection() {
     method: state.method,
     threshold: state.threshold,
     dotsize: state.dotsize,
+    dotMm: state.dotMm,
     intensity: state.intensity
   });
   invalidateBase();
@@ -1475,7 +1513,7 @@ function syncControls() {
   $('randomize').disabled = !state.img;
   $('save-project').disabled = $('open-project').disabled = !state.img;
   $('open-project-label').classList.toggle('is-disabled', !state.img);
-  for (const id of ['brightness', 'contrast', 'threshold', 'dotsize', 'intensity', 'brush-size', 'brush-strength']) $(id).value = state[id];
+  for (const id of ['brightness', 'contrast', 'threshold', 'intensity', 'brush-size', 'brush-strength']) $(id).value = state[id];
   $('black-point').value = state.blackPoint;
   $('white-point').value = state.whitePoint;
   $('pre-blur').value = state.preBlur;
@@ -1485,7 +1523,7 @@ function syncControls() {
   $('threshold-value').textContent = dithering ? '—' : (state.threshold ? String(state.threshold) : 'off');
   $('brightness-value').textContent = String(state.brightness);
   $('contrast-value').textContent = String(state.contrast);
-  $('dotsize-value').textContent = String(state.dotsize);
+  updateDotReadout();
   $('intensity-value').textContent = String(state.intensity);
   $('black-point-value').textContent = String(state.blackPoint);
   $('white-point-value').textContent = String(state.whitePoint);
@@ -1505,7 +1543,7 @@ function syncControls() {
   updateHistory();
 }
 
-for (const id of ['brightness', 'contrast', 'threshold', 'dotsize', 'intensity']) {
+for (const id of ['brightness', 'contrast', 'threshold', 'intensity']) {
   $(id).addEventListener('input', () => {
     if (!state.gesture) { pushHistory(); state.gesture = true; }
     if (id === 'threshold') state.previewPhoto = false;
@@ -1515,6 +1553,16 @@ for (const id of ['brightness', 'contrast', 'threshold', 'dotsize', 'intensity']
   });
   $(id).addEventListener('change', () => { state.gesture = false; });
 }
+$('dotsize').addEventListener('input', () => {
+  if (!state.gesture) { pushHistory(); state.gesture = true; }
+  state.previewPhoto = false;
+  state.dotMm = Number($('dotsize').value);
+  state.dotsize = null;
+  for (const zone of state.zones) zone.dotsize = null;
+  invalidateBase();
+  syncControls(); scheduleRender();
+});
+$('dotsize').addEventListener('change', () => { state.gesture = false; });
 $('method').addEventListener('change', () => {
   pushHistory();
   state.previewPhoto = false;
@@ -1540,10 +1588,12 @@ $('ghost-toggle').addEventListener('change', () => {
 $('print-width').addEventListener('input', () => {
   state.printWidth = Math.max(.1, Number($('print-width').value) || .1);
   syncPrintControls();
+  invalidateBase(); scheduleRender(); // the physical dot size is anchored to the print size
 });
 $('print-height').addEventListener('input', () => {
   state.printHeight = Math.max(.1, Number($('print-height').value) || .1);
   syncPrintControls();
+  invalidateBase(); scheduleRender();
 });
 $('print-unit').addEventListener('change', () => {
   const previous = state.printUnit;
@@ -1555,14 +1605,17 @@ $('print-unit').addEventListener('change', () => {
   state.printWidth = Math.max(.1, Math.round(millimetres / UNIT_MM[next] * 100) / 100);
   state.printHeight = Math.max(.1, Math.round(millimetresHeight / UNIT_MM[next] * 100) / 100);
   syncPrintControls();
+  invalidateBase(); scheduleRender();
 });
 $('dpi-select').addEventListener('change', () => {
   state.dpiPreset = $('dpi-select').value;
   syncPrintControls();
+  invalidateBase(); scheduleRender();
 });
 $('custom-dpi').addEventListener('input', () => {
   state.customDpi = Number($('custom-dpi').value) || 300;
   syncPrintControls();
+  invalidateBase(); scheduleRender();
 });
 $('invert-toggle').addEventListener('change', () => {
   if (!state.img) return;
@@ -1688,7 +1741,8 @@ function projectSettings() {
     contrast: state.contrast,
     threshold: state.threshold,
     method: state.method,
-    dotsize: state.dotsize,
+    dotsize: Number.isFinite(state.dotsize) ? state.dotsize : undefined,
+    dotMm: state.dotMm,
     intensity: state.intensity,
     mirrored: state.mirrored,
     invert: state.invert,
@@ -1770,7 +1824,8 @@ function normalizeProjectZones(value) {
       rect: {x: bounds.x0, y: bounds.y0, width, height},
       method: DITHER_METHODS.has(zone.method) ? zone.method : 'none',
       threshold: clamp(Math.round(finiteNumberOr(zone.threshold, 0)), 0, 100),
-      dotsize: clamp(Math.round(finiteNumberOr(zone.dotsize, 4)), 1, 16),
+      dotsize: zone.dotsize === null || zone.dotsize === undefined ? null : clamp(Math.round(finiteNumberOr(zone.dotsize, 4)), 1, 16),
+      dotMm: clamp(finiteNumberOr(zone.dotMm, .25), .1, 2),
       intensity: clamp(Math.round(finiteNumberOr(zone.intensity, 50)), 0, 100)
     };
   });
@@ -1805,7 +1860,8 @@ function applyProject(project) {
     contrast: clamp(Math.round(finiteNumberOr(settings.contrast, 0)), -100, 100),
     threshold: clamp(Math.round(finiteNumberOr(settings.threshold, 0)), 0, 100),
     method,
-    dotsize: clamp(Math.round(finiteNumberOr(settings.dotsize, 4)), 1, 16),
+    dotsize: settings.dotsize === null || settings.dotsize === undefined ? null : clamp(Math.round(finiteNumberOr(settings.dotsize, 4)), 1, 16),
+    dotMm: clamp(finiteNumberOr(settings.dotMm, .25), .1, 2),
     intensity: clamp(Math.round(finiteNumberOr(settings.intensity, 50)), 0, 100),
     mirrored: Boolean(settings.mirrored),
     invert: Boolean(settings.invert),
@@ -1923,6 +1979,8 @@ function buildEvidence() {
       threshold: state.threshold,
       method: state.method,
       dotsize: state.dotsize,
+      dotMm: state.dotMm,
+      dot_px: dotPrintPixels(),
       intensity: state.intensity,
       mirrored: state.mirrored,
       invert: state.invert,
